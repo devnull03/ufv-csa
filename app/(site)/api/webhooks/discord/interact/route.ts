@@ -12,6 +12,9 @@ import { discordAPIRest } from "../../../utils";
 import { writeServerClient } from "~/app/(site)/serverClient";
 import { revalidateTag, revalidatePath } from "next/cache";
 import { v4 as uuidv4 } from "uuid";
+import type { APIInteraction } from "discord-api-types/v10";
+import { handlePrintQInteraction, isPrintQInteraction } from "~/app/printq/discord/handlers";
+import { onRoomStatusChange } from "~/app/printq/room-status";
 
 /**
  * Use edge runtime which is faster, cheaper, and has no cold-boot.
@@ -41,6 +44,12 @@ export async function POST(request: Request) {
     // The `PING` message is used during the initial webhook handshake, and is
     // required to configure the webhook in the developer portal.
     return NextResponse.json({ type: InteractionResponseType.Pong });
+  }
+
+  // PrintQ shares this application's single interactions endpoint.
+  const anyInteraction = interaction as unknown as APIInteraction;
+  if (isPrintQInteraction(anyInteraction)) {
+    return handlePrintQInteraction(anyInteraction);
   }
 
   if (interaction.type === InteractionType.ApplicationCommand) {
@@ -145,6 +154,7 @@ export async function POST(request: Request) {
               status: isRoomOpen,
             }),
           ]);
+          await onRoomStatusChange(isRoomOpen).catch((error) => console.error("PrintQ room status hook failed", error));
 
           await discordAPIRest.post(
             Routes.webhook(process.env.DISCORD_BOT_ID!, interaction.token),

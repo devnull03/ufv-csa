@@ -19,6 +19,11 @@ export default function NavBar() {
           <InternalLinkButton href="/events" variant="ghost">
             Events
           </InternalLinkButton>
+          {process.env.NEXT_PUBLIC_PRINTQ_ENABLED === "true" && (
+            <InternalLinkButton href="/printing" variant="ghost">
+              3D Printing
+            </InternalLinkButton>
+          )}
           <InternalLinkButton href="/contact" variant="ghost">
             Contact
           </InternalLinkButton>

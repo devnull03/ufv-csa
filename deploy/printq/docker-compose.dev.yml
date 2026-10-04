@@ -1,0 +1,15 @@
+# Local Postgres for PrintQ development:
+#   docker compose -f deploy/printq/docker-compose.dev.yml up -d
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: printq
+      POSTGRES_PASSWORD: printq
+      POSTGRES_DB: printq
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - printq-pg:/var/lib/postgresql/data
+volumes:
+  printq-pg:

@@ -1,0 +1,12 @@
+# /etc/systemd/system/printq-cron.service
+[Unit]
+Description=PrintQ periodic jobs (expire holds, reminders, purge files)
+After=network-online.target
+
+[Service]
+Type=oneshot
+# /etc/printq/cron.env contains: PRINTQ_CRON_SECRET=...
+EnvironmentFile=/etc/printq/cron.env
+ExecStart=/usr/bin/curl --fail --silent --show-error -X POST \
+  -H "Authorization: Bearer ${PRINTQ_CRON_SECRET}" \
+  http://127.0.0.1:3000/api/printq/cron

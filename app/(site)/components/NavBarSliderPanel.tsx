@@ -54,6 +54,11 @@ export default function NavBarSliderPanel() {
                 <SheetNavButton href="/events" onClick={onClick}>
                   Events
                 </SheetNavButton>
+                {process.env.NEXT_PUBLIC_PRINTQ_ENABLED === "true" && (
+                  <SheetNavButton href="/printing" onClick={onClick}>
+                    3D Printing
+                  </SheetNavButton>
+                )}
                 <SheetNavButton href="/minutes" onClick={onClick}>
                   Minutes
                 </SheetNavButton>
