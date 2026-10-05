@@ -87,3 +87,47 @@ export function availableStarts(query: AvailableStartsQuery): Slot[] {
   }
   return slots;
 }
+
+export type StartProblem =
+  | "past"
+  | "closed"
+  | "before_open"
+  | "after_close"
+  | "runs_past_close"
+  | "overlaps_booking"
+  | "overlaps_pending"
+  | "overlaps_maintenance";
+
+export interface StartCheckContext {
+  windows: Interval[];
+  busy: (Interval & { kind: "booking" | "pending" | "maintenance" })[];
+  earliestStart: Date;
+  mustFinishInLabHours: boolean;
+  timeZone: string;
+}
+
+/**
+ * Why a print of `durationMinutes` cannot start at `start`, or null if it can.
+ * Mirrors availableStarts() so the picker can explain a rejected click.
+ */
+export function explainStart(start: Date, durationMinutes: number, context: StartCheckContext): StartProblem | null {
+  if (start.getTime() < context.earliestStart.getTime()) return "past";
+  const end = new Date(start.getTime() + durationMinutes * MINUTE);
+  const window = context.windows.find((w) => w.start.getTime() <= start.getTime() && start.getTime() < w.end.getTime());
+  if (!window) {
+    const day = localDateKey(start, context.timeZone);
+    const sameDay = context.windows.filter((w) => localDateKey(w.start, context.timeZone) === day);
+    if (sameDay.length === 0) return "closed";
+    return sameDay.some((w) => w.start.getTime() > start.getTime()) ? "before_open" : "after_close";
+  }
+  if (context.mustFinishInLabHours && end.getTime() > window.end.getTime()) return "runs_past_close";
+  const candidate = { start, end };
+  const clash = context.busy.find((block) => overlaps(block, candidate));
+  if (!clash) return null;
+  return clash.kind === "pending" ? "overlaps_pending" : clash.kind === "maintenance" ? "overlaps_maintenance" : "overlaps_booking";
+}
+
+function localDateKey(date: Date, timeZone: string) {
+  const { year, month, day } = localDateOf(date, timeZone);
+  return `${year}-${month}-${day}`;
+}

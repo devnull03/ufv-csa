@@ -24,7 +24,16 @@ const ACTION_UI: Record<Exclude<BookingAction, "expire">, { label: string; varia
  * CancelBookingDialog and RejectDialog in DESIGN_BRIEF §5.3/§5.4). Uses native
  * prompt/confirm until the real dialogs are designed.
  */
-export function BookingActionButtons({ bookingId, actions }: { bookingId: string; actions: BookingAction[] }) {
+export function BookingActionButtons({
+  bookingId,
+  actions,
+  appearance = "admin",
+}: {
+  bookingId: string;
+  actions: BookingAction[];
+  // "pq" renders with the PrintQ theme's square buttons (member pages).
+  appearance?: "admin" | "pq";
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState<BookingAction | null>(null);
 
@@ -48,6 +57,25 @@ export function BookingActionButtons({ bookingId, actions }: { bookingId: string
     }
     toast.success(`${ui.label}: done`);
     router.refresh();
+  }
+
+  const visible = actions.filter((action): action is Exclude<BookingAction, "expire"> => action !== "expire");
+  if (appearance === "pq") {
+    return (
+      <div className="flex flex-wrap gap-3">
+        {visible.map((action) => (
+          <button
+            key={action}
+            type="button"
+            className={`btn btn-md ${ACTION_UI[action].variant === "danger" ? "btn-danger" : ACTION_UI[action].variant === "success" ? "btn-primary" : "btn-secondary"}`}
+            disabled={busy !== null}
+            onClick={() => run(action)}
+          >
+            {ACTION_UI[action].label}
+          </button>
+        ))}
+      </div>
+    );
   }
 
   return (

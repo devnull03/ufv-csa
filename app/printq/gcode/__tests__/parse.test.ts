@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { bufferSource, GcodeParseError, parseDuration, parseGcodeFile, printerModelMatches } from "..";
+import { bufferSource, fitsBuildVolume, GcodeParseError, parseDuration, parseGcodeFile, printerModelMatches } from "..";
 import { parseGcode } from "../parse";
 import { asciiGcode, binaryGcode, PNG_1PX } from "./fixtures";
 
@@ -15,6 +15,8 @@ describe("ASCII .gcode", () => {
       filamentGrams: 12.88,
       filamentType: "PETG",
       printerModel: "MK4S",
+      layerHeightMm: 0.2,
+      nozzleDiameterMm: 0.4,
       bbox: { x: 67, y: 43.6, z: 18.2 },
       hasThumbnail: true,
     });
@@ -47,6 +49,8 @@ describe("binary .bgcode", () => {
       filamentGrams: 3.21,
       filamentType: "PLA",
       printerModel: "MK4S",
+      layerHeightMm: 0.2,
+      nozzleDiameterMm: 0.4,
       bbox: null,
       hasThumbnail: true,
     });
@@ -74,5 +78,12 @@ describe("helpers", () => {
     expect(printerModelMatches("MK4", "MK4S")).toBe(false);
     expect(printerModelMatches("MK4S", "MK4")).toBe(false);
     expect(printerModelMatches(null, "MK4S")).toBe(false);
+  });
+
+  it("checks the bounding box against the build volume", () => {
+    const bed = { bedX: 250, bedY: 210, bedZ: 220 };
+    expect(fitsBuildVolume({ x: 67, y: 43.6, z: 18.2 }, bed)).toBe(true);
+    expect(fitsBuildVolume({ x: 260, y: 10, z: 10 }, bed)).toBe(false);
+    expect(fitsBuildVolume(null, bed)).toBeNull();
   });
 });

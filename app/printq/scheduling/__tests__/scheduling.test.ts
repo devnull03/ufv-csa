@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PRINTQ_TIMEZONE as TZ } from "../../constants";
 import { mergeIntervals, subtractIntervals } from "../intervals";
-import { availableStarts, bookedDurationMinutes, labWindows, type WeeklyHours } from "../slots";
+import { availableStarts, bookedDurationMinutes, explainStart, labWindows, type WeeklyHours } from "../slots";
 import { allowedActions, canTransition, InvalidTransitionError, nextStatus } from "../state-machine";
 import { fromLocal, toLocal } from "../time";
 
@@ -170,6 +170,35 @@ describe("availableStarts", () => {
       "2026-11-02T22:00:00.000Z",
       "2026-11-02T23:00:00.000Z",
     ]);
+  });
+});
+
+describe("explainStart", () => {
+  const windows = labWindows({ start: at("2026-11-02T08:00Z"), end: at("2026-11-04T08:00Z") }, weekdays10to4, [], TZ);
+  const busy = [
+    { start: at("2026-11-02T19:00Z"), end: at("2026-11-02T20:00Z"), kind: "booking" as const },
+    { start: at("2026-11-02T21:00Z"), end: at("2026-11-02T22:00Z"), kind: "pending" as const },
+  ];
+  const context = { windows, busy, earliestStart: at("2026-11-02T18:30Z"), mustFinishInLabHours: true, timeZone: TZ };
+
+  it("names the reason a start is rejected", () => {
+    expect(explainStart(at("2026-11-02T18:00Z"), 30, context)).toBe("past");
+    expect(explainStart(at("2026-11-03T17:00Z"), 30, context)).toBe("before_open");
+    expect(explainStart(at("2026-11-03T00:30Z"), 30, context)).toBe("after_close");
+    expect(explainStart(at("2026-11-07T19:00Z"), 30, context)).toBe("closed"); // Saturday
+    expect(explainStart(at("2026-11-02T23:30Z"), 60, context)).toBe("runs_past_close");
+    expect(explainStart(at("2026-11-02T18:45Z"), 30, context)).toBe("overlaps_booking");
+    expect(explainStart(at("2026-11-02T20:30Z"), 60, context)).toBe("overlaps_pending");
+    expect(explainStart(at("2026-11-02T20:00Z"), 60, context)).toBeNull();
+  });
+
+  it("agrees with availableStarts", () => {
+    const slots = availableStarts({ ...context, durationMinutes: 45, stepMinutes: 15 });
+    for (const slot of slots) expect(explainStart(slot.start, 45, context)).toBeNull();
+    const offered = new Set(slots.map((slot) => slot.start.getTime()));
+    for (let t = windows[0].start.getTime(); t < windows[0].end.getTime(); t += 15 * 60_000) {
+      expect(explainStart(new Date(t), 45, context) === null).toBe(offered.has(t));
+    }
   });
 });
 

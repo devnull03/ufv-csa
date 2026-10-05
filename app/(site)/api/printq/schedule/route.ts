@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { disabledResponse } from "~/app/printq/api";
 import { errorResponse, PrintQError } from "~/app/printq/errors";
-import { getActivePrinter, loadScheduleData } from "~/app/printq/schedule";
+import { getActivePrinter, loadCalendar } from "~/app/printq/schedule";
 
 export const dynamic = "force-dynamic";
 
 const MAX_RANGE_MS = 31 * 86_400_000;
 
-// Public: lab hours, closures and busy blocks. Never includes who booked what.
+// Public: lab-hours windows and anonymous busy blocks. Never includes who booked what.
 export async function GET(request: Request) {
   const disabled = disabledResponse();
   if (disabled) return disabled;
@@ -20,17 +20,8 @@ export async function GET(request: Request) {
       throw new PrintQError("bad_request", "Invalid range");
     }
     const printer = await getActivePrinter();
-    const data = await loadScheduleData(printer.id, { start, end });
-    return NextResponse.json({
-      printer: { id: printer.id, name: printer.name, model: printer.model },
-      weeklyHours: data.weeklyHours,
-      closures: data.closures,
-      blocks: data.bookings.map(({ status, start: blockStart, end: blockEnd }) => ({
-        status: status === "pending" ? "pending" : "booked",
-        start: blockStart,
-        end: blockEnd,
-      })),
-    });
+    const calendar = await loadCalendar(printer.id, { start, end });
+    return NextResponse.json({ printer: { id: printer.id, name: printer.name, model: printer.model }, calendar });
   } catch (caught) {
     return errorResponse(caught);
   }

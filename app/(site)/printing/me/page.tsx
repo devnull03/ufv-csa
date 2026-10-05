@@ -1,66 +1,98 @@
-import InternalLinkButton from "~/app/(site)/components/General/InternalLinkButton";
+import { Plus } from "lucide-react";
+import Link from "next/link";
 import { SignOutButton } from "~/app/printq/components/auth";
-import { BookingCard } from "~/app/printq/components/booking";
-import { Placeholder } from "~/app/printq/components/Placeholder";
-import { EmptyState, PrintQHeader, QuotaMeter } from "~/app/printq/components/shared";
-import { SLOT_HOLDING_STATUSES } from "~/app/printq/constants";
+import { formatDuration, formatDay, formatTime } from "~/app/printq/format";
 import { listMyBookings } from "~/app/printq/queries";
-import { getSettings } from "~/app/printq/settings";
+import { StatusTag } from "~/app/printq/ui/StatusTag";
 import { requireMemberPage } from "~/app/printq/viewer";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "My prints" };
 
-const UPCOMING = new Set<string>([...SLOT_HOLDING_STATUSES, "finished"]);
-
-// DESIGN_BRIEF §4.5
+// Screen 07 · My prints: a table on desktop, stacked cards on mobile, newest first.
 export default async function MyPrintsPage() {
   const viewer = await requireMemberPage("/printing/me");
-  const [bookings, settings] = await Promise.all([listMyBookings(viewer.userId), getSettings()]);
-  const upcoming = bookings.filter((booking) => UPCOMING.has(booking.status));
-  const past = bookings.filter((booking) => !UPCOMING.has(booking.status));
-  const active = bookings.filter((booking) => (SLOT_HOLDING_STATUSES as readonly string[]).includes(booking.status)).length;
+  const bookings = await listMyBookings(viewer.userId);
+  const rows = bookings.map((booking) => ({
+    ...booking,
+    slot: `${formatDay(booking.start)}, ${formatTime(booking.start)}`,
+    length: formatDuration((booking.end.getTime() - booking.start.getTime()) / 60_000),
+  }));
 
   return (
     <>
-      <PrintQHeader
-        title="My prints"
-        description={`Signed in as ${viewer.name}`}
-        actions={
-          <>
-            <QuotaMeter used={active} max={settings.maxActiveBookingsPerUser} />
-            <InternalLinkButton href="/printing/new" variant="success">
-              Book a print
-            </InternalLinkButton>
-            <SignOutButton />
-          </>
-        }
-      />
-      {bookings.length === 0 ? (
-        <EmptyState title="No prints yet" body="Book your first print to see it here." />
+      <div className="flex flex-wrap items-end gap-4">
+        <div className="mr-auto flex flex-col gap-1.5">
+          <h2>My prints</h2>
+          <p className="pq-soft">
+            Signed in as {viewer.discordUsername ?? viewer.name} · <SignOutButton />
+          </p>
+        </div>
+        <Link href="/printing/new" className="btn btn-primary btn-md pq-cta">
+          <Plus size={16} strokeWidth={1.5} aria-hidden />
+          New print
+        </Link>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="pq-panel flex flex-col items-start gap-3 p-8">
+          <h3>No prints yet</h3>
+          <p className="pq-soft">Slice your model in PrusaSlicer, then book a time on the printer.</p>
+          <Link href="/printing/new" className="btn btn-primary btn-md">
+            Book a print
+          </Link>
+        </div>
       ) : (
-        <Placeholder name="Tabs (Upcoming / Past)" spec="§4.5">
-          {[
-            { title: "Upcoming", items: upcoming },
-            { title: "Past", items: past },
-          ].map((group) => (
-            <div key={group.title} className="mb-4 space-y-2">
-              <h2 className="font-semibold">{group.title}</h2>
-              {group.items.length === 0 && <p className="text-sm text-slate-400">Nothing here.</p>}
-              {group.items.map((booking) => (
-                <BookingCard
-                  key={booking.id}
-                  booking={booking}
-                  actions={
-                    <InternalLinkButton href={`/printing/me/${booking.id}`} variant="ghost" size="sm">
-                      View
-                    </InternalLinkButton>
-                  }
-                />
-              ))}
-            </div>
-          ))}
-        </Placeholder>
+        <>
+          <div className="pq-panel pq-desk-only overflow-x-auto">
+            <table className="table" style={{ minWidth: 680 }}>
+              <thead>
+                <tr>
+                  <th>Print</th>
+                  <th>Slot</th>
+                  <th>Length</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.id}>
+                    <td>
+                      <Link href={`/printing/me/${row.id}`} className="pq-heading" style={{ fontSize: 19, color: "var(--color-text)", textDecoration: "none" }}>
+                        {row.title}
+                      </Link>
+                    </td>
+                    <td className="pq-num">{row.slot}</td>
+                    <td className="pq-muted">{row.length}</td>
+                    <td>
+                      <StatusTag status={row.status} reason={row.decisionReason} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="pq-panel pq-mob-only flex flex-col">
+            {rows.map((row, index) => (
+              <Link
+                key={row.id}
+                href={`/printing/me/${row.id}`}
+                className={`flex flex-col gap-1.5 px-4 py-3.5 ${index ? "pq-rule-t" : ""}`}
+                style={{ color: "var(--color-text)", textDecoration: "none" }}
+              >
+                <span className="pq-heading" style={{ fontSize: 20 }}>
+                  {row.title}
+                </span>
+                <span className="pq-muted pq-num text-[13px]">
+                  {row.slot} · {row.length}
+                </span>
+                <span className="self-start">
+                  <StatusTag status={row.status} reason={row.decisionReason} />
+                </span>
+              </Link>
+            ))}
+          </div>
+        </>
       )}
     </>
   );

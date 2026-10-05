@@ -12,6 +12,8 @@ const thumbnailUrl = (uploadId: string, thumbnailKey: string | null) =>
 const bookingColumns = {
   id: schema.bookings.id,
   status: schema.bookings.status,
+  title: schema.bookings.title,
+  decisionReason: schema.bookings.decisionReason,
   slot: schema.bookings.slot,
   uploadId: schema.uploads.id,
   fileName: schema.uploads.originalName,
@@ -21,6 +23,8 @@ const bookingColumns = {
 type BookingRow = {
   id: string;
   status: BookingStatus;
+  title: string | null;
+  decisionReason: string | null;
   slot: { start: Date; end: Date };
   uploadId: string;
   fileName: string;
@@ -32,6 +36,8 @@ const toListItem = (row: BookingRow): BookingListItem => ({
   status: row.status,
   start: row.slot.start,
   end: row.slot.end,
+  title: row.title ?? row.fileName,
+  decisionReason: row.decisionReason,
   fileName: row.fileName,
   thumbnailUrl: thumbnailUrl(row.uploadId, row.thumbnailKey),
 });
@@ -54,7 +60,7 @@ export async function getBookingDetail(bookingId: string) {
       ...bookingColumns,
       ownerId: schema.bookings.ownerId,
       notes: schema.bookings.notes,
-      decisionReason: schema.bookings.decisionReason,
+      purpose: schema.bookings.purpose,
       holdExpiresAt: schema.bookings.holdExpiresAt,
       summary: schema.uploads.summary,
     })

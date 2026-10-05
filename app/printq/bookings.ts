@@ -1,7 +1,16 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray, lt, sql } from "drizzle-orm";
-import { ACCEPTED_EXTENSIONS, MAX_UPLOAD_BYTES, SLOT_HOLDING_STATUSES, SLOT_STEP_MINUTES, type BookingStatus } from "./constants";
+import {
+  ACCEPTED_EXTENSIONS,
+  MAX_UPLOAD_BYTES,
+  MIN_BOOKING_MINUTES,
+  SLOT_HOLDING_STATUSES,
+  SLOT_STEP_MINUTES,
+  type BookingPurpose,
+  type BookingStatus,
+  type PrintQSettings,
+} from "./constants";
 import { db, schema } from "./db/client";
 import { PrintQError, pgErrorCode } from "./errors";
 import { diskStore } from "./files";
@@ -59,8 +68,21 @@ export async function storeUpload(viewer: Viewer, filename: string, body: Readab
 export interface CreateBookingInput {
   uploadId: string;
   start: Date;
+  // Member-adjusted length; defaults to the file estimate plus padding and buffer.
+  durationMinutes?: number;
+  title?: string;
+  purpose?: BookingPurpose;
   notes?: string;
   modelUrl?: string;
+}
+
+/** Default booked length for a parsed file, and the bounds a member may adjust it within. */
+export function bookingLength(printSeconds: number, settings: PrintQSettings) {
+  return {
+    defaultMinutes: bookedDurationMinutes(printSeconds, settings, SLOT_STEP_MINUTES),
+    minMinutes: MIN_BOOKING_MINUTES,
+    maxMinutes: settings.maxPrintHours * 60,
+  };
 }
 
 export async function createBooking(viewer: Viewer, input: CreateBookingInput): Promise<Booking> {
@@ -86,7 +108,15 @@ export async function createBooking(viewer: Viewer, input: CreateBookingInput): 
     throw new PrintQError("too_long", `Prints are limited to ${settings.maxPrintHours} hours`);
   }
 
-  const durationMinutes = bookedDurationMinutes(printSeconds, settings, SLOT_STEP_MINUTES);
+  const length = bookingLength(printSeconds, settings);
+  const durationMinutes = input.durationMinutes ?? length.defaultMinutes;
+  if (
+    durationMinutes % SLOT_STEP_MINUTES !== 0 ||
+    durationMinutes < length.minMinutes ||
+    durationMinutes > length.maxMinutes
+  ) {
+    throw new PrintQError("bad_request", `Booking length must be ${length.minMinutes}–${length.maxMinutes} minutes in ${SLOT_STEP_MINUTES}-minute steps`);
+  }
   const start = input.start;
   const end = new Date(start.getTime() + durationMinutes * 60_000);
 
@@ -123,6 +153,8 @@ export async function createBooking(viewer: Viewer, input: CreateBookingInput): 
           uploadId: upload.id,
           slot: { start, end },
           status: "pending",
+          title: input.title?.trim().slice(0, 120) || upload.originalName.replace(/\.b?gcode$/i, "").slice(0, 120),
+          purpose: input.purpose ?? null,
           holdExpiresAt: new Date(Date.now() + settings.holdHours * 3_600_000),
           notes: input.notes?.slice(0, 500) || null,
           modelUrl: input.modelUrl || null,

@@ -36,6 +36,12 @@ export const PRINTER_MODELS = ["MK4S", "MK4", "MK3.9", "MK3S", "COREONE"] as con
 
 export const CLOSURE_KINDS = ["closure", "maintenance"] as const;
 
+export const BOOKING_PURPOSES = ["course", "club", "personal"] as const;
+export type BookingPurpose = (typeof BOOKING_PURPOSES)[number];
+
+// Members may adjust the booked length in these steps (DESIGN: "Time to book").
+export const MIN_BOOKING_MINUTES = 15;
+
 export interface PrintQSettings {
   paddingPct: number;
   bufferMinutes: number;

@@ -1,19 +1,31 @@
 "use client";
 
+import { SiDiscord } from "@icons-pack/react-simple-icons";
+import { EyeOff, Loader2, User } from "lucide-react";
 import { useState } from "react";
-import { Button } from "~/app/(site)/components/UI/button";
 import { AppDiscordInviteLink } from "~/app/(site)/config";
 import { authClient } from "../auth-client";
 import type { IneligibleReason } from "../roles";
-import { Placeholder } from "./Placeholder";
 
-// Auth components. DESIGN_BRIEF §4.3 and §5.5.
+// Screen 02 · Sign in, plus the eligibility states from DESIGN_BRIEF §4.3.
 
 const REASON_COPY: Record<IneligibleReason | "oauth_error", { title: string; body: string }> = {
-  not_in_server: { title: "Join the CSA Discord first", body: "PrintQ is for members of the CSA Discord server." },
-  missing_role: { title: "You need the verified role", body: "Get verified in the CSA Discord, then try again." },
-  banned: { title: "Your booking access is paused", body: "Contact a CSA executive if you think this is a mistake." },
-  oauth_error: { title: "Sign-in failed", body: "Something went wrong talking to Discord. Please try again." },
+  not_in_server: {
+    title: "Join the CSA Discord first",
+    body: "PrintQ is for members of the CSA Discord server. Join it, then sign in again.",
+  },
+  missing_role: {
+    title: "You need the verified role",
+    body: "Get verified in the CSA Discord server, then sign in again.",
+  },
+  banned: {
+    title: "Booking access is paused",
+    body: "Contact a CSA executive if you think this is a mistake.",
+  },
+  oauth_error: {
+    title: "Sign-in didn't finish",
+    body: "Something went wrong talking to Discord. Please try again.",
+  },
 };
 
 export function AuthCard({ reason, next }: { reason?: IneligibleReason | "oauth_error"; next: string }) {
@@ -30,38 +42,50 @@ export function AuthCard({ reason, next }: { reason?: IneligibleReason | "oauth_
   }
 
   return (
-    <Placeholder name={`AuthCard${reason ? ` (${reason})` : ""}`} spec="§4.3" className="mx-auto max-w-md space-y-3">
-      <h1 className="text-2xl font-bold">{copy?.title ?? "Sign in to book the 3D printer"}</h1>
-      <p className="text-sm text-slate-400">
-        {copy?.body ?? "We only see your Discord username and ID. We never see your email."}
-      </p>
-      <div className="flex flex-wrap gap-2">
-        <Button variant="information" loading={loading} onClick={signIn}>
-          {reason ? "Try again" : "Sign in with Discord"}
-        </Button>
-        {reason === "not_in_server" && (
-          <Button variant="outline" asChild>
-            <a href={AppDiscordInviteLink} target="_blank" rel="noreferrer">
-              Join the server
-            </a>
-          </Button>
-        )}
+    <div className="flex justify-center py-10 max-[759px]:py-2">
+      <div className="pq-panel flex w-full max-w-[440px] flex-col gap-[22px] p-8 max-[759px]:p-6">
+        <div className="flex flex-col gap-2">
+          <span className="pq-overline">PrintQ · Sign in</span>
+          <h2>{copy?.title ?? "Sign in to book"}</h2>
+          <p className="pq-soft" style={{ textWrap: "pretty" }}>
+            {copy?.body ?? "Use the Discord account that's in the CSA server. We'll DM you when your print is approved."}
+          </p>
+        </div>
+        <button type="button" className="btn btn-discord btn-lg" onClick={signIn} disabled={loading}>
+          {loading ? <Loader2 size={18} strokeWidth={1.5} className="pq-spin" aria-hidden /> : <SiDiscord size={18} aria-hidden />}
+          {reason ? "Try again with Discord" : "Continue with Discord"}
+        </button>
+        {reason === "not_in_server" ? (
+          <a href={AppDiscordInviteLink} target="_blank" rel="noreferrer" className="btn btn-secondary btn-md">
+            Join the CSA server
+          </a>
+        ) : null}
+        <div className="pq-rule-t pq-muted flex flex-col gap-2 pt-4 text-[13px]">
+          <span className="flex items-center gap-2">
+            <User size={14} strokeWidth={1.5} aria-hidden />
+            We read your username and CSA member role.
+          </span>
+          <span className="flex items-center gap-2">
+            <EyeOff size={14} strokeWidth={1.5} aria-hidden />
+            Your name never appears on the public schedule.
+          </span>
+        </div>
       </div>
-    </Placeholder>
+    </div>
   );
 }
 
 export function SignOutButton() {
   return (
-    <Button
-      size="sm"
-      variant="ghost"
+    <button
+      type="button"
+      className="btn btn-ghost"
       onClick={async () => {
         await authClient.signOut();
         window.location.href = "/printing";
       }}
     >
       Sign out
-    </Button>
+    </button>
   );
 }

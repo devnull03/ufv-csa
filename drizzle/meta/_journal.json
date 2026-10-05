@@ -15,6 +15,13 @@
       "when": 1791098974248,
       "tag": "0001_booking_exclusion",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791189064902,
+      "tag": "0002_booking_title_purpose",
+      "breakpoints": true
     }
   ]
 }

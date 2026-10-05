@@ -1,7 +1,8 @@
 import { open } from "node:fs/promises";
 import { parseGcode, type ByteSource, type ParsedGcode } from "./parse";
 
-export { GcodeParseError, parseDuration, printerModelMatches } from "./parse";
+export { GcodeParseError, parseDuration } from "./parse";
+export { fitsBuildVolume, printerModelMatches } from "./model";
 export type { ParsedGcode, Thumbnail } from "./parse";
 
 export function bufferSource(buffer: Uint8Array): ByteSource {

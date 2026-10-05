@@ -160,6 +160,27 @@ describe.skipIf(!databaseUrl)("booking service (Postgres)", () => {
     });
   });
 
+  it("accepts a member-adjusted length, name and purpose, and rejects off-step lengths", async () => {
+    const upload = await mod.bookings.storeUpload(alice, "wall_bracket_v3.gcode", stream(asciiGcode()));
+    const start = nextStart(3);
+    await expect(
+      mod.bookings.createBooking(alice, { uploadId: upload.id, start, durationMinutes: 50 })
+    ).rejects.toMatchObject({ code: "bad_request" });
+    const booking = await mod.bookings.createBooking(alice, {
+      uploadId: upload.id,
+      start,
+      durationMinutes: 180,
+      title: "Wall bracket v3",
+      purpose: "course",
+    });
+    expect(booking.slot.end.getTime() - booking.slot.start.getTime()).toBe(180 * 60_000);
+    expect(booking).toMatchObject({ title: "Wall bracket v3", purpose: "course" });
+
+    const second = await mod.bookings.storeUpload(alice, "cable_clips.gcode", stream(asciiGcode()));
+    const untitled = await mod.bookings.createBooking(alice, { uploadId: second.id, start: nextStart(8) });
+    expect(untitled.title).toBe("cable_clips");
+  });
+
   it("expires holds that were never reviewed", async () => {
     const upload = await mod.bookings.storeUpload(alice, "a.gcode", stream(asciiGcode()));
     const booking = await mod.bookings.createBooking(alice, { uploadId: upload.id, start: nextStart(3) });

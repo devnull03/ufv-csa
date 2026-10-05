@@ -38,6 +38,7 @@ export function asciiGcode() {
     "; prusaslicer_config = begin",
     "; filament_type = PETG",
     "; layer_height = 0.2",
+    "; nozzle_diameter = 0.4",
     "; printer_model = MK4S",
     "; prusaslicer_config = end",
     "",

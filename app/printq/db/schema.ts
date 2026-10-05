@@ -13,6 +13,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import {
+  BOOKING_PURPOSES,
   BOOKING_STATUSES,
   CLOSURE_KINDS,
   PRINTER_STATUSES,
@@ -47,6 +48,7 @@ export const userRole = printq.enum("user_role", USER_ROLES);
 export const bookingStatus = printq.enum("booking_status", BOOKING_STATUSES);
 export const printerStatus = printq.enum("printer_status", PRINTER_STATUSES);
 export const closureKind = printq.enum("closure_kind", CLOSURE_KINDS);
+export const bookingPurpose = printq.enum("booking_purpose", BOOKING_PURPOSES);
 
 // --- Better Auth core tables (field names required by the drizzle adapter) ---
 
@@ -167,6 +169,8 @@ export interface ParsedGcodeSummary {
   filamentGrams: number | null;
   filamentType: string | null;
   printerModel: string | null;
+  layerHeightMm?: number | null;
+  nozzleDiameterMm?: number | null;
   bbox: { x: number; y: number; z: number } | null;
   hasThumbnail: boolean;
 }
@@ -203,6 +207,8 @@ export const bookings = printq.table(
       .references(() => uploads.id),
     slot: tstzrange("slot").notNull(),
     status: bookingStatus("status").notNull().default("pending"),
+    title: text("title"),
+    purpose: bookingPurpose("purpose"),
     holdExpiresAt: timestamp("hold_expires_at", { withTimezone: true }),
     notes: text("notes"),
     modelUrl: text("model_url"),

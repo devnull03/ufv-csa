@@ -166,9 +166,17 @@ function summarize(
     filamentGrams: number("filament used [g]") ?? number("total filament used [g]"),
     filamentType: metadata["filament_type"]?.split(";")[0] ?? null,
     printerModel: metadata["printer_model"] || null,
+    layerHeightMm: number("layer_height"),
+    nozzleDiameterMm: firstNumber(metadata["nozzle_diameter"]),
     bbox: boundingBox(head, number("max_layer_z")),
     hasThumbnail: thumbnail !== null,
   };
+}
+
+// Multi-extruder values are comma-separated ("0.4,0.4"); use the first.
+function firstNumber(value: string | undefined) {
+  const parsed = Number.parseFloat(value?.split(",")[0] ?? "");
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 // "1d 2h 3m 4s" -> seconds
@@ -189,13 +197,4 @@ function boundingBox(head: string, maxLayerZ: number | null): ParsedGcodeSummary
   const m555 = /^M555\s+X[-\d.]+\s+Y[-\d.]+\s+W([\d.]+)\s+H([\d.]+)/m.exec(head);
   if (!m555 || maxLayerZ === null) return null;
   return { x: Number(m555[1]), y: Number(m555[2]), z: maxLayerZ };
-}
-
-export function printerModelMatches(fileModel: string | null, printerModel: string) {
-  if (!fileModel) return false;
-  const normalize = (value: string) => value.toUpperCase().replace(/[^A-Z0-9.]/g, "");
-  // Accept variants such as MK4S vs MK4SMMU3, but not MK4 vs MK4S.
-  const file = normalize(fileModel);
-  const printer = normalize(printerModel);
-  return file === printer || (file.startsWith(printer) && /^MMU|^IS/.test(file.slice(printer.length)));
 }

@@ -4,7 +4,7 @@ PrintQ is the CSA 3D-printer booking system. It lives inside the main site at `/
 
 It stores its data in a local PostgreSQL database (`printq` schema) on the same UFV server as the site. Uploaded files go on that server's disk.
 
-- **Design:** [`DESIGN_BRIEF.md`](./DESIGN_BRIEF.md). All UI is currently **placeholder** (dashed boxes labelled `PLACEHOLDER`).
+- **Design:** the student flow (home, sign in, upload → choose time → review → sent, my prints) is built from the PrintQ design project ("Industry" re-tokened with CSA colours; theme in `app/printq/printq.css`, components in `app/printq/ui/`). Staff/admin pages are still **placeholder** UI per [`DESIGN_BRIEF.md`](./DESIGN_BRIEF.md).
 - **Background:** [`../printq-integration-audit.md`](../printq-integration-audit.md).
 
 ## Status
@@ -16,7 +16,8 @@ It stores its data in a local PostgreSQL database (`printq` schema) on the same 
 | G-code / bgcode parser (`app/printq/gcode/`) | ✅ done, tested on synthetic fixtures; **add real PrusaSlicer exports** to `__tests__/fixtures/` |
 | Discord login (Better Auth, `identify` scope) + bot-token membership/role check | ✅ wired; needs real Discord app credentials to test |
 | Upload → parse → availability → book → approve → session lifecycle APIs | ✅ done, integration-tested |
-| Pages and routes for the whole page tree | ✅ placeholder UI, real data |
+| Student pages (home + 3D printer view, sign in, booking flow, my prints, booking detail) | ✅ designed UI, real data |
+| Staff/admin pages | ✅ routes and data; ⏳ placeholder UI until designed |
 | Settings editors, closures CRUD, users/roles/bans actions | ⏳ read-only placeholders; build with the real design |
 | Discord `/print` commands, approval buttons, DMs, reminders | ⏳ stubs (`app/printq/discord/handlers.ts`, `jobs.ts`) |
 | Room-status integration (`/sccroom` → check-in/no-show logic) | ⏳ hook in place (`app/printq/room-status.ts`) |

@@ -86,6 +86,8 @@ export interface BookingListItem {
   status: BookingStatus;
   start: Date;
   end: Date;
+  title: string;
+  decisionReason: string | null;
   fileName: string;
   thumbnailUrl: string | null;
 }
