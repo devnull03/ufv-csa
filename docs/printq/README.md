@@ -6,6 +6,7 @@ It stores its data in a local PostgreSQL database (`printq` schema) on the same 
 
 - **Design:** the student flow (home, sign in, upload → choose time → review → sent, my prints) is built from the PrintQ design project ("Industry" re-tokened with CSA colours; theme in `app/printq/printq.css`, components in `app/printq/ui/`). Staff/admin pages are still **placeholder** UI per [`DESIGN_BRIEF.md`](./DESIGN_BRIEF.md).
 - **Background:** [`../printq-integration-audit.md`](../printq-integration-audit.md).
+- **Discord bot plan** (staff channel, living request cards, availability from Discord): [`DISCORD_BOT.md`](./DISCORD_BOT.md).
 
 ## Status
 
