@@ -22,6 +22,13 @@
       "when": 1791189064902,
       "tag": "0002_booking_title_purpose",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791190317765,
+      "tag": "0003_notifications",
+      "breakpoints": true
     }
   ]
 }

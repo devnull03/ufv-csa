@@ -28,7 +28,23 @@ const REASON_COPY: Record<IneligibleReason | "oauth_error", { title: string; bod
   },
 };
 
-export function AuthCard({ reason, next }: { reason?: IneligibleReason | "oauth_error"; next: string }) {
+const DEMO_CHOICES = [
+  { role: "member", label: "Member", hint: "Book prints" },
+  { role: "staff", label: "Staff", hint: "Approve and run sessions" },
+  { role: "admin", label: "Admin", hint: "Everything, plus settings" },
+] as const;
+
+export function AuthCard({
+  reason,
+  next,
+  discordEnabled,
+  demo,
+}: {
+  reason?: IneligibleReason | "oauth_error";
+  next: string;
+  discordEnabled: boolean;
+  demo: boolean;
+}) {
   const [loading, setLoading] = useState(false);
   const copy = reason ? REASON_COPY[reason] : null;
 
@@ -51,10 +67,30 @@ export function AuthCard({ reason, next }: { reason?: IneligibleReason | "oauth_
             {copy?.body ?? "Use the Discord account that's in the CSA server. We'll DM you when your print is approved."}
           </p>
         </div>
-        <button type="button" className="btn btn-discord btn-lg" onClick={signIn} disabled={loading}>
-          {loading ? <Loader2 size={18} strokeWidth={1.5} className="pq-spin" aria-hidden /> : <SiDiscord size={18} aria-hidden />}
-          {reason ? "Try again with Discord" : "Continue with Discord"}
-        </button>
+        {discordEnabled ? (
+          <button type="button" className="btn btn-discord btn-lg" onClick={signIn} disabled={loading}>
+            {loading ? <Loader2 size={18} strokeWidth={1.5} className="pq-spin" aria-hidden /> : <SiDiscord size={18} aria-hidden />}
+            {reason ? "Try again with Discord" : "Continue with Discord"}
+          </button>
+        ) : (
+          <p className="pq-muted text-[13px]">Discord sign-in isn&apos;t configured on this server yet.</p>
+        )}
+        {demo ? (
+          <form method="post" action="/api/printq/demo/sign-in" className="pq-panel flex flex-col gap-3 p-4">
+            <input type="hidden" name="next" value={next} />
+            <span className="pq-label">Demo mode · try it without Discord</span>
+            <div className="flex flex-col gap-2">
+              {DEMO_CHOICES.map((choice) => (
+                <button key={choice.role} type="submit" name="role" value={choice.role} className="btn btn-secondary" style={{ justifyContent: "space-between" }}>
+                  <span>{choice.label}</span>
+                  <span className="pq-muted" style={{ fontFamily: "var(--font-body)", fontWeight: 400, fontSize: 12, textTransform: "none", letterSpacing: 0 }}>
+                    {choice.hint}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </form>
+        ) : null}
         {reason === "not_in_server" ? (
           <a href={AppDiscordInviteLink} target="_blank" rel="noreferrer" className="btn btn-secondary btn-md">
             Join the CSA server

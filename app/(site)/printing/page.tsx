@@ -6,6 +6,7 @@ import { formatClock, formatDay, formatDuration, formatTime, WEEKDAY_NAMES } fro
 import { getLabStatus } from "~/app/printq/lab-status";
 import { getActivePrinter, getCurrentPrint, getNextClosure, loadCalendar } from "~/app/printq/schedule";
 import { getSettings } from "~/app/printq/settings";
+import { getPrinterTelemetry } from "~/app/printq/telemetry";
 import { PrinterHero } from "~/app/printq/ui/PrinterHero";
 import { WeekCalendar } from "~/app/printq/ui/WeekCalendar";
 import { getViewer } from "~/app/printq/viewer";
@@ -59,11 +60,11 @@ export default async function PrintingPage() {
   const nextBusy = current ? null : busyFrom(calendar, now);
   const freeUntil = nextBusy && todayWindow && nextBusy < todayWindow.end ? nextBusy : null;
 
-  const comingSoon = "Live data coming soon";
+  const telemetry = getPrinterTelemetry(Boolean(current));
   const stats = [
-    { icon: Thermometer, label: "Nozzle", value: "—", sub: comingSoon },
-    { icon: Layers, label: "Bed", value: "—", sub: comingSoon },
-    { icon: Disc3, label: "Loaded", value: "—", sub: "Ask staff in D224" },
+    { icon: Thermometer, label: "Nozzle", ...telemetry.nozzle },
+    { icon: Layers, label: "Bed", ...telemetry.bed },
+    { icon: Disc3, label: "Loaded", ...telemetry.loaded },
     {
       icon: CalendarClock,
       label: "Next opening",

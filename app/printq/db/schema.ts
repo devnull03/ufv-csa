@@ -240,3 +240,27 @@ export const bookingEvents = printq.table(
   },
   (table) => [index("booking_events_booking_idx").on(table.bookingId)]
 );
+
+export const notificationDelivery = printq.enum("notification_delivery", ["outbox", "discord", "failed"]);
+
+// Every message PrintQ sends (or would send). In demo mode, or when the bot
+// isn't configured, rows stay "outbox" and are shown on the staff dashboard.
+export const notifications = printq.table(
+  "notifications",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    kind: text("kind").notNull(),
+    bookingId: uuid("booking_id").references(() => bookings.id, { onDelete: "cascade" }),
+    recipientUserId: text("recipient_user_id").references(() => user.id, { onDelete: "set null" }),
+    recipientDiscordId: text("recipient_discord_id"),
+    channelId: text("channel_id"),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    delivery: notificationDelivery("delivery").notNull().default("outbox"),
+    error: text("error"),
+    // Prevents duplicate reminders: one row per key.
+    dedupeKey: text("dedupe_key").unique(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("notifications_created_idx").on(table.createdAt)]
+);

@@ -1,11 +1,13 @@
 import { desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { inBackground } from "~/app/printq/background";
 import z from "zod";
 import { disabledResponse } from "~/app/printq/api";
 import { createBooking } from "~/app/printq/bookings";
 import { BOOKING_PURPOSES } from "~/app/printq/constants";
 import { db, schema } from "~/app/printq/db/client";
 import { errorResponse, PrintQError } from "~/app/printq/errors";
+import { onBookingRequested } from "~/app/printq/notify";
 import { requireApiViewer } from "~/app/printq/viewer";
 
 export const dynamic = "force-dynamic";
@@ -46,7 +48,7 @@ export async function POST(request: Request) {
     const parsed = createSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) throw new PrintQError("bad_request", "Invalid booking request");
     const booking = await createBooking(viewer, { ...parsed.data, start: new Date(parsed.data.start) });
-    // TODO(phase 3): post the approval request to PRINTQ_ADMIN_CHANNEL_ID and DM the member.
+    inBackground(() => onBookingRequested(booking, viewer.discordUsername ?? viewer.name));
     return NextResponse.json({ booking }, { status: 201 });
   } catch (caught) {
     return errorResponse(caught);

@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { inBackground } from "~/app/printq/background";
 import z from "zod";
 import { disabledResponse } from "~/app/printq/api";
 import { transitionBooking } from "~/app/printq/bookings";
 import { errorResponse, PrintQError } from "~/app/printq/errors";
+import { onBookingTransition } from "~/app/printq/notify";
 import { BOOKING_ACTIONS, type BookingAction } from "~/app/printq/scheduling/state-machine";
 import { requireApiViewer } from "~/app/printq/viewer";
 
@@ -25,7 +27,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (!parsed.success || parsed.data.action === "expire") throw new PrintQError("bad_request", "Invalid action");
     const { id } = await params;
     const booking = await transitionBooking(viewer, id, parsed.data.action, parsed.data.note);
-    // TODO(phase 3): notify the member on Discord.
+    const { action, note } = parsed.data;
+    inBackground(() => onBookingTransition(booking, action, viewer.userId, note));
     return NextResponse.json({ booking });
   } catch (caught) {
     return errorResponse(caught);

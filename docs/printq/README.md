@@ -14,13 +14,17 @@ It stores its data in a local PostgreSQL database (`printq` schema) on the same 
 | DB schema + migrations (`drizzle/`) incl. no-double-booking exclusion constraint | ✅ done, tested against Postgres 16 |
 | Scheduling engine (`app/printq/scheduling/`) | ✅ done, unit-tested (DST, closures, overlaps) |
 | G-code / bgcode parser (`app/printq/gcode/`) | ✅ done, tested on synthetic fixtures; **add real PrusaSlicer exports** to `__tests__/fixtures/` |
-| Discord login (Better Auth, `identify` scope) + bot-token membership/role check | ✅ wired; needs real Discord app credentials to test |
+| Discord login (Better Auth, `identify` scope) + bot-token membership/role check | ✅ done; full OAuth round trip integration-tested with Discord's API mocked (`discord.db.test.ts`) |
+| Demo mode (`PRINTQ_DEMO=true`): demo accounts, demo data, outbox, simulated telemetry | ✅ done (see below) |
 | Upload → parse → availability → book → approve → session lifecycle APIs | ✅ done, integration-tested |
 | Student pages (home + 3D printer view, sign in, booking flow, my prints, booking detail) | ✅ designed UI, real data |
-| Staff/admin pages | ✅ routes and data; ⏳ placeholder UI until designed |
+| Staff dashboard, approvals, session | ✅ styled, real data, working actions |
+| Staff schedule, settings, users, audit pages | ✅ routes and data; ⏳ placeholder UI until designed |
 | Settings editors, closures CRUD, users/roles/bans actions | ⏳ read-only placeholders; build with the real design |
-| Discord `/print` commands, approval buttons, DMs, reminders | ⏳ stubs (`app/printq/discord/handlers.ts`, `jobs.ts`) |
-| Room-status integration (`/sccroom` → check-in/no-show logic) | ⏳ hook in place (`app/printq/room-status.ts`) |
+| Discord `/print schedule\|mine\|cancel`, Approve/Reject buttons (+ reason modal) | ✅ done, integration-tested (`discord/handlers.ts`) |
+| Notifications: request received, admin approval post, decisions, 24 h / 1 h reminders, lab-opened, expired holds | ✅ done (`notify.ts`); every message is logged to `printq.notifications` and shown on the staff dashboard |
+| Room-status integration (`/sccroom` → "lab is open" DMs) | ✅ hook in place (`room-status.ts`); check-in/no-show automation still manual |
+| Printer telemetry | ⏳ simulated in demo mode (`telemetry.ts`); real printer hook later |
 
 ## Layout
 
@@ -37,14 +41,53 @@ app/printq/                 non-route code
   bookings.ts               uploads, create booking, transitions, hold expiry
   schedule.ts, queries.ts   read models for pages and APIs
   jobs.ts                   periodic jobs (POST /api/printq/cron)
+  notify.ts                 Discord DMs/admin posts + outbox log (printq.notifications)
+  profiles.ts               Better Auth user → PrintQ profile/Viewer
+  lab-status.ts             lab open/closed (Discord /sccroom, or local in demo)
+  demo.ts, telemetry.ts     demo sign-in sessions, simulated printer readings
   discord/                  REST, membership check, /print command definition, handlers
   components/               PLACEHOLDER components named per DESIGN_BRIEF §5
 app/(site)/printing/        pages (inherit the site layout)
 app/(site)/api/printq/      route handlers
 drizzle/                    SQL migrations (0001 is hand-written: exclusion constraint)
-scripts/                    seed, dev login, Discord command registration
+scripts/                    seed, demo seed, dev login, Discord command registration
 deploy/printq/              nginx snippet, systemd timer, backup script, dev docker-compose
 ```
+
+## Try the prototype (demo mode)
+
+Everything runs for real (Postgres, Better Auth sessions, the booking engine and state machine, the notification hooks); only the outside world is faked.
+
+```bash
+docker compose -f deploy/printq/docker-compose.dev.yml up -d   # or any local Postgres 16
+cp .env.example .env.local
+#   NEXT_PUBLIC_PRINTQ_ENABLED=true, PRINTQ_DEMO=true, BETTER_AUTH_SECRET=$(openssl rand -base64 32),
+#   PRINTQ_CRON_SECRET=$(openssl rand -hex 32), PRINTQ_UPLOAD_DIR=./.printq-uploads,
+#   NEXT_PUBLIC_SANITY_PROJECT_ID=dummy000 (if you have no Sanity project)
+npm ci
+npm run printq:setup            # migrate + printer/lab hours + demo people and bookings
+npm run dev                     # http://localhost:3000/printing
+```
+
+Re-seed from scratch at any time with `npm run printq:demo-seed -- --reset`.
+
+On **Sign in** pick a demo account:
+
+| Account | Role | Try |
+|---|---|---|
+| Maya K. (`maya.k`) | member | upload a `.gcode`/`.bgcode`, pick a time, request; see My prints |
+| Sam (`sam.staff`) | staff | Dashboard → approve/reject, run a session, open/close the lab, "Run scheduled jobs now" |
+| Alex (`alex.admin`) | admin | everything, plus settings/users/audit |
+
+What is faked in demo mode:
+
+- **Discord membership:** everyone counts as a verified CSA member.
+- **Discord messages:** nothing is sent. Every DM and admin-channel post is written to `printq.notifications` and listed under *Messages sent* on the staff dashboard.
+- **Lab status:** staff toggle it on the dashboard instead of `/sccroom`. Opening it sends "the lab is open" messages to today's bookers.
+- **Printer readings:** nozzle/bed/filament values are simulated.
+- **Cron:** "Run scheduled jobs now" runs the same jobs as `POST /api/printq/cron` (hold expiry, reminders, upload cleanup).
+
+**Real Discord login in demo mode:** set `DISCORD_BOT_ID` and `DISCORD_CLIENT_SECRET` of a Discord app you control, and add `http://localhost:3000/api/printq/auth/callback/discord` as an OAuth2 redirect URI. "Continue with Discord" then works next to the demo accounts. Add `DISCORD_BOT_TOKEN`, `DISCORD_SERVER_ID` and `PRINTQ_VERIFIED_ROLE_ID` and turn `PRINTQ_DEMO` off to get real membership checks and real DMs.
 
 ## Local development
 

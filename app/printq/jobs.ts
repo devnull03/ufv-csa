@@ -4,6 +4,7 @@ import { SLOT_HOLDING_STATUSES } from "./constants";
 import { expireHolds } from "./bookings";
 import { db, schema } from "./db/client";
 import { diskStore } from "./files";
+import { onHoldsExpired, sendReminders } from "./notify";
 import { getSettings } from "./settings";
 
 export interface JobReport {
@@ -15,9 +16,10 @@ export interface JobReport {
 /** Everything periodic, run by POST /api/printq/cron (systemd timer every 5 minutes). */
 export async function runJobs(now = new Date()): Promise<JobReport> {
   const expiredHolds = await expireHolds(db(), now);
+  await onHoldsExpired(expiredHolds);
   const purgedUploads = await purgeOldUploads(now);
-  // TODO(phase 3): 24 h / 1 h reminders, no-show after grace, hold-expired DMs.
-  return { expiredHolds, purgedUploads, remindersSent: 0 };
+  const remindersSent = await sendReminders(now);
+  return { expiredHolds, purgedUploads, remindersSent };
 }
 
 async function purgeOldUploads(now: Date) {

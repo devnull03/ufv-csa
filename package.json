@@ -13,7 +13,9 @@
     "db:migrate": "drizzle-kit migrate",
     "printq:seed": "tsx --env-file-if-exists=.env.local scripts/printq-seed.ts",
     "printq:dev-login": "tsx --env-file-if-exists=.env.local scripts/printq-dev-login.ts",
-    "discord:register": "tsx --env-file-if-exists=.env.local scripts/discord-register-commands.ts"
+    "discord:register": "tsx --env-file-if-exists=.env.local scripts/discord-register-commands.ts",
+    "printq:demo-seed": "tsx --env-file-if-exists=.env.local scripts/printq-demo-seed.ts",
+    "printq:setup": "npm run db:migrate && npm run printq:seed && npm run printq:demo-seed"
   },
   "overrides": {
     "@sanity/uuid": {
