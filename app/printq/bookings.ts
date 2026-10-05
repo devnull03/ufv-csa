@@ -18,6 +18,7 @@ import { GcodeParseError, parseGcodeFile, printerModelMatches } from "./gcode";
 import { findAvailableSlots, getActivePrinter } from "./schedule";
 import { bookedDurationMinutes } from "./scheduling/slots";
 import { nextStatus, type BookingAction, type BookingActor } from "./scheduling/state-machine";
+import { formatSlot } from "./format";
 import { getSettings } from "./settings";
 import { hasRole, type Viewer } from "./roles";
 
@@ -243,4 +244,56 @@ export async function expireHolds(tx: Tx | ReturnType<typeof db> = db(), now = n
     );
   }
   return expired.map(({ id }) => id);
+}
+
+/**
+ * Staff move a pending or approved booking to a new start, keeping its length.
+ * The no-overlap constraint is the final judge; a clash names the booking in the way.
+ */
+export async function moveBooking(viewer: Viewer, bookingId: string, start: Date): Promise<{ booking: Booking; from: Booking["slot"] }> {
+  if (!hasRole(viewer, "staff")) throw new PrintQError("forbidden", "Only staff can move bookings");
+  if (start.getTime() < Date.now() - 5 * 60_000) throw new PrintQError("bad_request", "That time has already passed");
+  try {
+    return await db().transaction(async (tx) => {
+      const [booking] = await tx.select().from(schema.bookings).where(eq(schema.bookings.id, bookingId)).for("update").limit(1);
+      if (!booking) throw new PrintQError("not_found", "Booking not found");
+      if (booking.status !== "pending" && booking.status !== "approved") {
+        throw new PrintQError("invalid_transition", `Only pending or approved bookings can be moved (this one is ${booking.status})`);
+      }
+      const length = booking.slot.end.getTime() - booking.slot.start.getTime();
+      const slot = { start, end: new Date(start.getTime() + length) };
+      const [updated] = await tx
+        .update(schema.bookings)
+        .set({ slot, updatedAt: new Date() })
+        .where(eq(schema.bookings.id, bookingId))
+        .returning();
+      await tx.insert(schema.bookingEvents).values({
+        bookingId,
+        actorId: viewer.userId,
+        action: "move",
+        fromStatus: booking.status,
+        toStatus: booking.status,
+        note: `${booking.slot.start.toISOString()} → ${start.toISOString()}`,
+      });
+      return { booking: updated, from: booking.slot };
+    });
+  } catch (error) {
+    if (pgErrorCode(error) !== "23P01") throw error;
+    const [clash] = await db()
+      .select({ title: schema.bookings.title, slot: schema.bookings.slot })
+      .from(schema.bookings)
+      .where(
+        and(
+          inArray(schema.bookings.status, [...SLOT_HOLDING_STATUSES]),
+          sql`${schema.bookings.id} <> ${bookingId}`,
+          sql`${schema.bookings.slot} && tstzrange(${start.toISOString()}::timestamptz, ${start.toISOString()}::timestamptz + (
+            SELECT upper(slot) - lower(slot) FROM printq.bookings WHERE id = ${bookingId}), '[)')`
+        )
+      )
+      .limit(1);
+    throw new PrintQError(
+      "slot_unavailable",
+      clash ? `That overlaps ${clash.title ?? "another booking"} (${formatSlot(clash.slot.start, clash.slot.end)})` : "That time overlaps another booking"
+    );
+  }
 }

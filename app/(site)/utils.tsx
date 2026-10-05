@@ -11,6 +11,7 @@ import {
 	type APIPingInteraction,
 } from "discord-api-types/v10";
 import nacl from "tweetnacl";
+import { isFreshTimestamp } from "~/app/printq/discord/freshness";
 import InternalLink from "./components/General/InternalLink";
 import { allCampusOptions } from "../sanity/constants";
 
@@ -240,6 +241,10 @@ export async function verifyInteractionRequest(
 	const signature = request.headers.get("x-signature-ed25519");
 	const timestamp = request.headers.get("x-signature-timestamp");
 	if (typeof signature !== "string" || typeof timestamp !== "string") {
+		return { isValid: false };
+	}
+	// Reject stale requests so a captured interaction can't be replayed later.
+	if (!isFreshTimestamp(timestamp)) {
 		return { isValid: false };
 	}
 

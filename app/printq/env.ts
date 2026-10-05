@@ -24,6 +24,8 @@ const schema = z
     PRINTQ_VERIFIED_ROLE_ID: snowflake.optional(),
     PRINTQ_STAFF_ROLE_ID: snowflake.optional(),
     PRINTQ_ADMIN_CHANNEL_ID: snowflake.optional(),
+    // Optional members' channel for the anonymous "this week" board.
+    PRINTQ_PUBLIC_CHANNEL_ID: snowflake.optional(),
     PRINTQ_ADMIN_DISCORD_IDS: z
       .string()
       .default("")

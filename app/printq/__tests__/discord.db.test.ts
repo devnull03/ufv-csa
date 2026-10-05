@@ -65,7 +65,7 @@ describe.skipIf(!databaseUrl)("Discord login and interactions (Postgres)", () =>
       if (url.startsWith(`https://discord.com/api/v10/guilds/${GUILD}/members/`)) {
         return memberRoles ? Response.json({ roles: memberRoles, user: { username: DISCORD_USER.username } }) : new Response("{}", { status: 404 });
       }
-      if (url.startsWith("https://discord.com/")) return new Response("{}", { status: 200 });
+      if (url.startsWith("https://discord.com/")) return Response.json({ id: String(Date.now()) });
       return realFetch(input, init);
     });
   });
@@ -79,7 +79,7 @@ describe.skipIf(!databaseUrl)("Discord login and interactions (Postgres)", () =>
     memberRoles = [VERIFIED_ROLE];
     tokenRequests.length = 0;
     await mod.client.db().execute(
-      sql`TRUNCATE printq.notifications, printq.booking_events, printq.bookings, printq.uploads, printq.closures,
+      sql`TRUNCATE printq.discord_messages, printq.notifications, printq.booking_events, printq.bookings, printq.uploads, printq.closures,
         printq.lab_hours, printq.settings, printq.printers, printq.profiles, printq.session, printq.account,
         printq.verification, printq."user" CASCADE`
     );
@@ -208,8 +208,9 @@ describe.skipIf(!databaseUrl)("Discord login and interactions (Postgres)", () =>
 
     const approved = await call(button("222222222222222222"));
     expect(approved.type).toBe(InteractionResponseType.UpdateMessage);
-    expect(approved.data.components).toEqual([]);
-    expect(approved.data.embeds[1].description).toContain("Approved by");
+    expect(approved.data.embeds[0].title).toContain("Approved");
+    expect(approved.data.embeds[0].description).toContain("Approved by <@222222222222222222>");
+    expect(JSON.stringify(approved.data.components)).toContain(`printq:check_in:${booking.id}`);
 
     const reject = await call({
       type: InteractionType.MessageComponent,
@@ -217,6 +218,7 @@ describe.skipIf(!databaseUrl)("Discord login and interactions (Postgres)", () =>
       member: { user: { id: "222222222222222222" } },
     });
     expect(reject.type).toBe(InteractionResponseType.Modal);
+    expect(reject.data.custom_id).toBe(`printq:m_reject:${booking.id}`);
 
     const [row] = await database.select().from(schema.bookings);
     expect(row.status).toBe("approved");

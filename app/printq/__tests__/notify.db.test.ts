@@ -35,7 +35,7 @@ describe.skipIf(!databaseUrl)("notification hooks (Postgres, demo mode)", () => 
 
   beforeEach(async () => {
     await mod.client.db().execute(
-      sql`TRUNCATE printq.notifications, printq.booking_events, printq.bookings, printq.uploads, printq.settings,
+      sql`TRUNCATE printq.discord_messages, printq.notifications, printq.booking_events, printq.bookings, printq.uploads, printq.settings,
         printq.printers, printq.profiles, printq.account, printq."user" CASCADE`
     );
   });
@@ -69,12 +69,18 @@ describe.skipIf(!databaseUrl)("notification hooks (Postgres, demo mode)", () => 
 
   it("records request and decision messages in the outbox", async () => {
     const booking = await approvedBookingIn(300);
-    await mod.notify.onBookingRequested(booking, "maya");
+    await mod.notify.onBookingRequested(booking);
     await mod.notify.onBookingTransition(booking, "approve", "staff", undefined);
-    const rows = await outbox();
-    expect(rows.map((row) => row.kind)).toEqual(["request_received", "approval_request", "booking_approve"]);
+    const rows = (await outbox()).filter((row) => row.kind !== "card_log");
+    expect(rows.map((row) => row.kind)).toEqual(["request_received", "booking_approve"]);
     expect(rows.every((row) => row.delivery === "outbox")).toBe(true);
     expect(rows[0].recipientDiscordId).toBe("900000000000000001");
+    // The staff channel gets one card, edited in place, with a log line per change.
+    const cards = await mod.client.db().select().from(mod.schema.discordMessages);
+    expect(cards.filter((row) => row.kind === "card")).toHaveLength(1);
+    const logs = (await outbox()).filter((row) => row.kind === "card_log").map((row) => row.title);
+    // Maya has no Discord username in this fixture, and the "staff" actor doesn't exist.
+    expect(logs).toEqual(["📥 Requested by Maya", "✅ Approved by someone"]);
   });
 
   it("sends each reminder once, however often the jobs run", async () => {

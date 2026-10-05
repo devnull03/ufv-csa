@@ -4,6 +4,8 @@ import { SLOT_HOLDING_STATUSES } from "./constants";
 import { expireHolds } from "./bookings";
 import { db, schema } from "./db/client";
 import { diskStore } from "./files";
+import { purgeOldDrafts } from "./availability";
+import { syncBoards } from "./discord/sync";
 import { onHoldsExpired, sendReminders } from "./notify";
 import { getSettings } from "./settings";
 
@@ -19,6 +21,9 @@ export async function runJobs(now = new Date()): Promise<JobReport> {
   await onHoldsExpired(expiredHolds);
   const purgedUploads = await purgeOldUploads(now);
   const remindersSent = await sendReminders(now);
+  await purgeOldDrafts(now);
+  // Keeps "now printing" and "today" on the Discord boards current.
+  await syncBoards();
   return { expiredHolds, purgedUploads, remindersSent };
 }
 

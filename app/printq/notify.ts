@@ -1,17 +1,12 @@
 import "server-only";
-import {
-  ButtonStyle,
-  ComponentType,
-  type APIActionRowComponent,
-  type APIMessageActionRowComponent,
-  type APIEmbed,
-} from "discord-api-types/v10";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import type { APIActionRowComponent, APIMessageActionRowComponent, APIEmbed } from "discord-api-types/v10";
+import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { AppLogoBlendedGreenDecimal } from "~/app/(site)/config";
 import { PRINTQ_TIMEZONE } from "./constants";
 import { db, schema } from "./db/client";
-import { printqCustomId } from "./discord/commands";
+import { memberButtons } from "./discord/render";
 import { discordFetch } from "./discord/rest";
+import { actorLabel, syncBoards, syncBooking } from "./discord/sync";
 import { discordBotConfigured, printqEnv, siteOrigin } from "./env";
 import { formatDay, formatDuration, formatSlot, formatTime } from "./format";
 import type { BookingAction } from "./scheduling/state-machine";
@@ -58,6 +53,7 @@ async function send(target: { userId: string } | { adminChannel: true }, message
         title: message.title,
         body: message.body,
         dedupeKey: message.dedupeKey ?? null,
+        components: message.components ?? null,
       })
       .onConflictDoNothing({ target: schema.notifications.dedupeKey })
       .returning({ id: schema.notifications.id });
@@ -98,7 +94,7 @@ async function send(target: { userId: string } | { adminChannel: true }, message
 const bookingLink = (id: string) => `${siteOrigin()}/printing/me/${id}`;
 const title = (booking: Booking) => booking.title ?? "Your print";
 
-export async function onBookingRequested(booking: Booking, requesterName: string) {
+export async function onBookingRequested(booking: Booking) {
   const slot = formatSlot(booking.slot.start, booking.slot.end);
   await send(
     { userId: booking.ownerId },
@@ -109,26 +105,8 @@ export async function onBookingRequested(booking: Booking, requesterName: string
       body: `**${title(booking)}** is pending approval for ${slot}. We'll message you as soon as staff review it.`,
     }
   );
-  const minutes = (booking.slot.end.getTime() - booking.slot.start.getTime()) / 60_000;
-  await send(
-    { adminChannel: true },
-    {
-      kind: "approval_request",
-      bookingId: booking.id,
-      title: `New print request · ${title(booking)}`,
-      body: `${requesterName} wants ${slot} (${formatDuration(minutes)}).${booking.notes ? `\nNotes: ${booking.notes}` : ""}`,
-      components: [
-        {
-          type: ComponentType.ActionRow,
-          components: [
-            { type: ComponentType.Button, style: ButtonStyle.Success, label: "Approve", custom_id: printqCustomId("approve", booking.id) },
-            { type: ComponentType.Button, style: ButtonStyle.Danger, label: "Reject", custom_id: printqCustomId("reject", booking.id) },
-            { type: ComponentType.Button, style: ButtonStyle.Link, label: "Open in PrintQ", url: `${siteOrigin()}/printing/admin/approvals` },
-          ],
-        },
-      ],
-    }
-  );
+  // The staff channel gets a card that is edited for the rest of the booking's life.
+  await syncBooking(booking.id, `📥 Requested by ${await actorLabel(booking.ownerId)}`);
 }
 
 const DECISION_COPY: Partial<Record<BookingAction, (booking: Booking, note?: string) => { title: string; body: string }>> = {
@@ -140,25 +118,85 @@ const DECISION_COPY: Partial<Record<BookingAction, (booking: Booking, note?: str
     title: "Print declined",
     body: `**${title(booking)}** was declined${note ? `: ${note}` : "."} You can upload a new file and book again.`,
   }),
-  cancel: (booking) => ({ title: "Booking cancelled", body: `**${title(booking)}** was cancelled.` }),
+  cancel: (booking, note) => ({ title: "Booking cancelled", body: `Staff cancelled **${title(booking)}**${note ? `: ${note}` : "."}` }),
   finish: (booking) => ({ title: "Ready for pickup", body: `**${title(booking)}** is done. Grab it from D224 during lab hours.` }),
   fail: (booking, note) => ({
     title: "Print failed",
     body: `Sorry, **${title(booking)}** failed${note ? `: ${note}` : "."} Book again whenever you're ready.`,
   }),
   no_show: (booking) => ({ title: "Missed slot", body: `We marked **${title(booking)}** as a no-show. Book again if you still need it.` }),
-  lab_closed: (booking) => ({
-    title: "Lab was closed",
-    body: `The lab was closed for **${title(booking)}**. Sorry about that; please book a new time.`,
+  lab_closed: (booking, note) => ({
+    title: "Lab closed",
+    body: `The lab is closed for **${title(booking)}**${note ? ` (${note})` : ""}. Sorry about that; please book a new time.`,
   }),
 };
 
+/** One line per change in the card's thread. */
+function logLine(action: BookingAction, actor: string, isOwner: boolean, note?: string) {
+  const why = note ? `: ${note}` : "";
+  switch (action) {
+    case "approve":
+      return `✅ Approved by ${actor}`;
+    case "reject":
+      return `❌ Declined by ${actor}${why}`;
+    case "cancel":
+      return isOwner ? "🚫 Cancelled by the member" : `🚫 Cancelled by ${actor}${why}`;
+    case "check_in":
+      return `📍 Checked in by ${actor}`;
+    case "start":
+      return `🖨️ Print started by ${actor}`;
+    case "finish":
+      return `🏁 Finished · ${actor}`;
+    case "fail":
+      return `⚠️ Failed · ${actor}${why}`;
+    case "collect":
+      return `📦 Collected · ${actor}`;
+    case "no_show":
+      return `👻 No-show · ${actor}`;
+    case "lab_closed":
+      return `🔒 Lab closed${why}`;
+    case "expire":
+      return "⌛ Hold expired before anyone reviewed it";
+  }
+}
+
 export async function onBookingTransition(booking: Booking, action: BookingAction, actorUserId: string | null, note?: string) {
+  const isOwner = actorUserId === booking.ownerId;
+  await syncBooking(booking.id, logLine(action, await actorLabel(actorUserId), isOwner, note));
   const copy = DECISION_COPY[action];
   // Members don't need a message about their own cancellation.
-  if (!copy || (action === "cancel" && actorUserId === booking.ownerId)) return;
+  if (!copy || (action === "cancel" && isOwner)) return;
   const { title: heading, body } = copy(booking, note);
-  await send({ userId: booking.ownerId }, { kind: `booking_${action}`, bookingId: booking.id, title: heading, body: `${body}\n${bookingLink(booking.id)}` });
+  await send(
+    { userId: booking.ownerId },
+    {
+      kind: `booking_${action}`,
+      bookingId: booking.id,
+      title: heading,
+      body: `${body}\n${bookingLink(booking.id)}`,
+      components: action === "approve" ? memberButtons("cancel", booking.id) : undefined,
+    }
+  );
+}
+
+/** Staff moved a booking: log it on the card and ask the member to keep or cancel. */
+export async function onBookingMoved(booking: Booking, from: Booking["slot"], actorUserId: string) {
+  await syncBooking(booking.id, `🕒 Moved by ${await actorLabel(actorUserId)} from ${formatSlot(from.start, from.end)}`);
+  await send(
+    { userId: booking.ownerId },
+    {
+      kind: "booking_moved",
+      bookingId: booking.id,
+      title: "Your print was moved",
+      body: `Staff moved **${title(booking)}** to **${formatSlot(booking.slot.start, booking.slot.end)}** (was ${formatSlot(from.start, from.end)}).`,
+      components: memberButtons("moved", booking.id),
+    }
+  );
+}
+
+/** Closures or lab hours changed. */
+export async function onAvailabilityChanged() {
+  await syncBoards();
 }
 
 export async function onHoldsExpired(bookingIds: string[]) {
@@ -175,6 +213,7 @@ export async function onHoldsExpired(bookingIds: string[]) {
         dedupeKey: `hold_expired:${booking.id}`,
       }
     );
+    await syncBooking(booking.id, logLine("expire", "PrintQ", false));
   }
 }
 
@@ -203,6 +242,7 @@ export async function sendReminders(now = new Date()) {
         title: window === "1h" ? "Your print starts soon" : sameDay ? "Print later today" : "Print tomorrow",
         body: `**${title(booking)}** starts at ${formatTime(booking.slot.start)} (${formatSlot(booking.slot.start, booking.slot.end)}). Head to D224.`,
         dedupeKey: `reminder_${window}:${booking.id}`,
+        components: memberButtons("cancel", booking.id),
       }
     );
     sent++;
@@ -251,10 +291,14 @@ export async function recentNotifications(limit = 25) {
       error: schema.notifications.error,
       createdAt: schema.notifications.createdAt,
       recipient: schema.user.name,
+      recipientDiscordId: schema.notifications.recipientDiscordId,
+      bookingId: schema.notifications.bookingId,
+      components: schema.notifications.components,
       channelId: schema.notifications.channelId,
     })
     .from(schema.notifications)
     .leftJoin(schema.user, eq(schema.user.id, schema.notifications.recipientUserId))
+    .where(ne(schema.notifications.kind, "card_log"))
     .orderBy(sql`${schema.notifications.id} desc`)
     .limit(limit);
 }

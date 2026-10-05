@@ -6,15 +6,13 @@ import {
   Routes
 } from "discord-api-types/v10";
 import { NextResponse } from "next/server";
-import { AppAbbreviationName, AppLogoBlendedGreenDecimal, AppRoomName } from "~/app/(site)/config";
+import { AppAbbreviationName, AppRoomName } from "~/app/(site)/config";
 import { verifyInteractionRequest } from "~/app/(site)/utils";
 import { discordAPIRest } from "../../../utils";
-import { writeServerClient } from "~/app/(site)/serverClient";
-import { revalidateTag, revalidatePath } from "next/cache";
 import { v4 as uuidv4 } from "uuid";
 import type { APIInteraction } from "discord-api-types/v10";
 import { handlePrintQInteraction, isPrintQInteraction } from "~/app/printq/discord/handlers";
-import { onRoomStatusChange } from "~/app/printq/room-status";
+import { setRoomStatus } from "~/app/printq/discord/room";
 
 /**
  * Use edge runtime which is faster, cheaper, and has no cold-boot.
@@ -115,46 +113,9 @@ export async function POST(request: Request) {
           }
         );
 
-        const DISCORD_SCC_ROOM_CHANNEL_ID =
-          process.env.DISCORD_SCC_ROOM_CHANNEL_ID!;
         try {
-          await discordAPIRest.patch(
-            Routes.channel(DISCORD_SCC_ROOM_CHANNEL_ID),
-            {
-              body: {
-                name: `${roomItems.emoji} ${isRoomOpen ? "open" : "closed"}`,
-              }
-            }
-          );
-
-          const siteHost = `http${process.env.NODE_ENV === "development" ? "" : "s"}://${process.env.SITE_DOMAIN}`;
-
-          await Promise.all([
-            // https://docs.discord.com/developers/resources/message#create-message
-            discordAPIRest.post(
-              Routes.channelMessages(DISCORD_SCC_ROOM_CHANNEL_ID),
-              {
-                body: {
-                  // Discord nonces are capped at 25 characters.
-                  nonce: uuidv4().substring(0, 25),
-                  enforce_nonce: true,
-                  embeds: [{
-                    description: `${roomItems.emoji}: <@${discordUser.id}> has ${roomItems.statusPastTense} the [${AppRoomName}](${siteHost}/scc)`,
-                    color: AppLogoBlendedGreenDecimal,
-                    image: {
-                      url: `${siteHost}/CSA_SCC_Room_${isRoomOpen ? "Open" : "Closed"}.png`,
-                    }
-                  }]
-                }
-              }
-            ),
-            writeServerClient.create({
-              _type: "roomStatus",
-              discordUserId: discordUser.id,
-              status: isRoomOpen,
-            }),
-          ]);
-          await onRoomStatusChange(isRoomOpen).catch((error) => console.error("PrintQ room status hook failed", error));
+          // Shared with the PrintQ staff board's lab button.
+          await setRoomStatus({ open: isRoomOpen, discordUserId: discordUser.id });
 
           await discordAPIRest.post(
             Routes.webhook(process.env.DISCORD_BOT_ID!, interaction.token),
@@ -168,8 +129,6 @@ export async function POST(request: Request) {
               }
             }
           );
-          revalidateTag("roomStatus");
-          revalidatePath("/api/room-status", "page");
           return new NextResponse("Success");
         } catch (e) {
           console.error(e);

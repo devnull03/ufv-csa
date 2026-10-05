@@ -10,8 +10,10 @@ import {
   text,
   time,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import {
   BOOKING_PURPOSES,
   BOOKING_STATUSES,
@@ -260,7 +262,38 @@ export const notifications = printq.table(
     error: text("error"),
     // Prevents duplicate reminders: one row per key.
     dedupeKey: text("dedupe_key").unique(),
+    // Discord message components (buttons) sent with the message, if any.
+    components: jsonb("components").$type<unknown[]>(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("notifications_created_idx").on(table.createdAt)]
+);
+
+export const discordMessageKind = printq.enum("discord_message_kind", ["card", "board", "public_board"]);
+
+export interface DiscordMessagePayload {
+  embeds: unknown[];
+  components: unknown[];
+}
+
+// Bot messages PrintQ keeps editing: one card per booking in the staff channel,
+// the pinned staff board, and the optional public board. In demo mode the
+// rendered payload is stored here instead of being sent (channelId "demo").
+export const discordMessages = printq.table(
+  "discord_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    kind: discordMessageKind("kind").notNull(),
+    bookingId: uuid("booking_id").references(() => bookings.id, { onDelete: "cascade" }),
+    channelId: text("channel_id").notNull(),
+    messageId: text("message_id").notNull(),
+    threadId: text("thread_id"),
+    payload: jsonb("payload").$type<DiscordMessagePayload>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("discord_messages_card_idx").on(table.bookingId).where(sql`${table.kind} = 'card'`),
+    uniqueIndex("discord_messages_board_idx").on(table.kind).where(sql`${table.kind} <> 'card'`),
+  ]
 );

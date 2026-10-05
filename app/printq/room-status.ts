@@ -1,17 +1,19 @@
 import "server-only";
 import { isPrintQEnabled } from "./env";
-import { onLabOpened } from "./notify";
+import { onAvailabilityChanged, onLabOpened } from "./notify";
 
 /**
- * Called by the existing /sccroom handler after the room status is saved.
- * When the lab opens, members with approved bookings today get a heads-up.
+ * Called by the existing /sccroom handler (and the staff board's lab button)
+ * after the room status is saved. When the lab opens, members with approved
+ * bookings today get a heads-up; either way the Discord boards are refreshed.
  * Must never throw into /sccroom.
  */
 export async function onRoomStatusChange(isOpen: boolean): Promise<void> {
-  if (!isPrintQEnabled() || !isOpen) return;
+  if (!isPrintQEnabled()) return;
   try {
-    await onLabOpened();
+    if (isOpen) await onLabOpened();
+    await onAvailabilityChanged();
   } catch (error) {
-    console.error("PrintQ lab-opened hook failed", error);
+    console.error("PrintQ room status hook failed", error);
   }
 }

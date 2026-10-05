@@ -2,7 +2,7 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { db, schema } from "./db/client";
 import { isDemoMode } from "./env";
-import { onLabOpened } from "./notify";
+import { onAvailabilityChanged, onLabOpened } from "./notify";
 
 export interface LabStatus {
   open: boolean | null;
@@ -41,12 +41,13 @@ export async function getLabStatus(): Promise<LabStatus> {
 }
 
 /** PrintQ's own lab toggle (demo mode / no CMS). Opening the lab runs the lab-opened hook. */
-export async function setLabStatus(open: boolean, actorId: string) {
+export async function setLabStatus(open: boolean, actorId: string | null) {
   const value = { open, since: new Date().toISOString() };
   await db()
     .insert(schema.settings)
     .values({ key: KEY, value, updatedBy: actorId })
     .onConflictDoUpdate({ target: schema.settings.key, set: { value, updatedBy: actorId, updatedAt: new Date() } });
   if (open) await onLabOpened();
+  await onAvailabilityChanged();
   return value;
 }

@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     const parsed = createSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) throw new PrintQError("bad_request", "Invalid booking request");
     const booking = await createBooking(viewer, { ...parsed.data, start: new Date(parsed.data.start) });
-    inBackground(() => onBookingRequested(booking, viewer.discordUsername ?? viewer.name));
+    inBackground(() => onBookingRequested(booking));
     return NextResponse.json({ booking }, { status: 201 });
   } catch (caught) {
     return errorResponse(caught);
