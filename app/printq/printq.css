@@ -568,3 +568,48 @@
   .pq .btn-icon { width: 44px; height: 44px; }
   .pq-desk-only { display: none !important; }
 }
+
+/* ---------- Discord preview (demo mode) ----------
+ * A stand-in for the real channels, styled after Discord's dark theme so staff
+ * recognise what they'll see there. */
+.pq .dc-root { --dc-bg: #313338; --dc-embed: #2b2d31; --dc-text: #dbdee1; --dc-muted: #949ba4; --dc-line: #3f4147; color: var(--dc-text); font-family: var(--font-body); font-size: 14px; }
+.pq .dc-columns { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 959px) { .pq .dc-columns { grid-template-columns: minmax(0, 1fr); } }
+.pq .dc-channel { background: var(--dc-bg); border: 1px solid var(--dc-line); display: flex; flex-direction: column; min-width: 0; }
+.pq .dc-channel-head { display: flex; align-items: center; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--dc-line); font-weight: 600; color: #f2f3f5; }
+.pq .dc-message { display: flex; gap: 12px; padding: 12px 14px; border-bottom: 1px solid rgba(255, 255, 255, 0.03); }
+.pq .dc-avatar { flex: none; width: 36px; height: 36px; border-radius: 50%; background: #52a040; color: #0f172a; display: grid; place-items: center; font-weight: 700; font-size: 12px; }
+.pq .dc-author { font-weight: 600; color: #f2f3f5; }
+.pq .dc-badge { background: #5865f2; color: #fff; font-size: 10px; font-weight: 600; padding: 0 4px; border-radius: 3px; line-height: 15px; }
+.pq .dc-meta { color: var(--dc-muted); font-size: 12px; }
+.pq .dc-text { line-height: 1.375; overflow-wrap: anywhere; }
+.pq .dc-code { background: #1e1f22; padding: 0 3px; border-radius: 3px; font-size: 0.85em; }
+.pq .dc-quote { border-left: 3px solid #4e5058; padding-left: 8px; }
+.pq .dc-embed { background: var(--dc-embed); border-left: 4px solid #4e5058; border-radius: 4px; padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 8px; max-width: 560px; }
+.pq .dc-embed-title { font-weight: 600; color: #f2f3f5; font-size: 15px; }
+.pq .dc-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 12px; }
+.pq .dc-field { grid-column: 1 / -1; }
+.pq .dc-field-inline { grid-column: span 1; }
+@media (max-width: 520px) { .pq .dc-field-inline { grid-column: 1 / -1; } }
+.pq .dc-field-name { font-weight: 600; color: #f2f3f5; font-size: 13px; }
+.pq .dc-footer { color: var(--dc-muted); font-size: 12px; }
+.pq .dc-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 2px 14px; border-radius: 4px; border: 0; font-size: 14px; font-weight: 500; color: #fff; cursor: pointer; text-decoration: none; }
+.pq .dc-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.pq .dc-btn-primary { background: #5865f2; }
+.pq .dc-btn-secondary { background: #4e5058; }
+.pq .dc-btn-success { background: #248046; }
+.pq .dc-btn-danger { background: #da373c; }
+.pq .dc-btn:not(:disabled):hover { filter: brightness(1.1); }
+.pq .dc-select, .pq .dc-input { background: #1e1f22; color: var(--dc-text); border: 1px solid #1e1f22; border-radius: 4px; min-height: 36px; padding: 0 10px; font-size: 14px; max-width: 100%; }
+.pq .dc-select { width: 100%; max-width: 560px; }
+.pq .dc-input { flex: 1 1 160px; min-width: 0; }
+.pq .dc-ephemeral { margin: 10px 14px 0; padding: 10px 12px; background: rgba(88, 101, 242, 0.1); border-left: 2px solid #5865f2; display: flex; flex-direction: column; gap: 8px; }
+.pq .dc-dismiss { background: none; border: 0; color: var(--dc-muted); cursor: pointer; }
+.pq .dc-thread { margin-top: 4px; color: var(--dc-muted); font-size: 13px; }
+.pq .dc-thread summary { cursor: pointer; display: inline-flex; align-items: center; gap: 6px; color: #00a8fc; }
+.pq .dc-thread ul { margin: 6px 0 0; padding-left: 12px; border-left: 2px solid var(--dc-line); display: flex; flex-direction: column; gap: 3px; color: var(--dc-text); }
+.pq .dc-composer { padding: 12px 14px; border-top: 1px solid var(--dc-line); display: flex; flex-direction: column; gap: 10px; background: #2b2d31; }
+.pq .dc-chip { background: #1e1f22; color: var(--dc-text); border: 0; border-radius: 4px; padding: 4px 10px; font-size: 13px; cursor: pointer; }
+.pq .dc-chip:hover { background: #404249; }
+.pq .dc-modal-backdrop { position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, 0.7); display: grid; place-items: center; padding: 16px; }
+.pq .dc-modal { background: var(--dc-bg); color: var(--dc-text); width: min(440px, 100%); padding: 18px; border-radius: 6px; display: flex; flex-direction: column; gap: 14px; }

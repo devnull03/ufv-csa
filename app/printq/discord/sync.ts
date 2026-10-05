@@ -312,3 +312,22 @@ export async function cardLogs(bookingIds: string[]) {
     .where(and(eq(schema.notifications.kind, "card_log"), inArray(schema.notifications.bookingId, bookingIds)))
     .orderBy(asc(schema.notifications.id));
 }
+
+/** Demo preview: make sure the boards exist and every live booking has a card (seeded data never went through the hooks). */
+export async function ensureCards(limit = 40) {
+  const missing = await db()
+    .select({ id: schema.bookings.id })
+    .from(schema.bookings)
+    .leftJoin(
+      schema.discordMessages,
+      and(eq(schema.discordMessages.bookingId, schema.bookings.id), eq(schema.discordMessages.kind, "card"))
+    )
+    .where(and(isNull(schema.discordMessages.id), inArray(schema.bookings.status, ["pending", "approved", "checked_in", "printing", "finished"])))
+    .orderBy(sql`lower(${schema.bookings.slot})`)
+    .limit(limit);
+  for (const { id } of missing) {
+    const data = await loadCardData(id);
+    if (data) await deliver("card", id, renderCard(data, { live: isLive(), siteOrigin: siteOrigin() }), { channelId: printqEnv().PRINTQ_ADMIN_CHANNEL_ID });
+  }
+  await syncBoards();
+}

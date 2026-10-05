@@ -6,7 +6,7 @@ It stores its data in a local PostgreSQL database (`printq` schema) on the same 
 
 - **Design:** the student flow (home, sign in, upload → choose time → review → sent, my prints) is built from the PrintQ design project ("Industry" re-tokened with CSA colours; theme in `app/printq/printq.css`, components in `app/printq/ui/`). Staff/admin pages are still **placeholder** UI per [`DESIGN_BRIEF.md`](./DESIGN_BRIEF.md).
 - **Background:** [`../printq-integration-audit.md`](../printq-integration-audit.md).
-- **Discord bot plan** (staff channel, living request cards, availability from Discord): [`DISCORD_BOT.md`](./DISCORD_BOT.md).
+- **Discord bot** (staff channel, living request cards, availability from Discord): plan, as-built notes and setup in [`DISCORD_BOT.md`](./DISCORD_BOT.md).
 
 ## Status
 
@@ -22,7 +22,9 @@ It stores its data in a local PostgreSQL database (`printq` schema) on the same 
 | Staff dashboard, approvals, session | ✅ styled, real data, working actions |
 | Staff schedule, settings, users, audit pages | ✅ routes and data; ⏳ placeholder UI until designed |
 | Settings editors, closures CRUD, users/roles/bans actions | ⏳ read-only placeholders; build with the real design |
-| Discord `/print schedule\|mine\|cancel`, Approve/Reject buttons (+ reason modal) | ✅ done, integration-tested (`discord/handlers.ts`) |
+| Discord `/print schedule\|mine\|cancel` | ✅ done, integration-tested (`discord/handlers.ts`) |
+| Discord staff channel: living request cards with per-state buttons + update threads, pinned board (lab open/close, closures, lab hours, review queue), `/printstaff`, move time, member DM buttons, public board | ✅ done, tested in demo and live-REST modes. See [`DISCORD_BOT.md`](./DISCORD_BOT.md) |
+| Closures and lab hours editors on the website | ✅ done (same service as the bot) |
 | Notifications: request received, admin approval post, decisions, 24 h / 1 h reminders, lab-opened, expired holds | ✅ done (`notify.ts`); every message is logged to `printq.notifications` and shown on the staff dashboard |
 | Room-status integration (`/sccroom` → "lab is open" DMs) | ✅ hook in place (`room-status.ts`); check-in/no-show automation still manual |
 | Printer telemetry | ⏳ simulated in demo mode (`telemetry.ts`); real printer hook later |
@@ -46,7 +48,8 @@ app/printq/                 non-route code
   profiles.ts               Better Auth user → PrintQ profile/Viewer
   lab-status.ts             lab open/closed (Discord /sccroom, or local in demo)
   demo.ts, telemetry.ts     demo sign-in sessions, simulated printer readings
-  discord/                  REST, membership check, /print command definition, handlers
+  availability.ts           closures, lab hours, closure drafts (shared by bot and website)
+  discord/                  REST, membership, commands, handlers, render (embeds/buttons), sync (cards/boards), staff, room toggle
   components/               PLACEHOLDER components named per DESIGN_BRIEF §5
 app/(site)/printing/        pages (inherit the site layout)
 app/(site)/api/printq/      route handlers
@@ -84,7 +87,8 @@ What is faked in demo mode:
 
 - **Discord membership:** everyone counts as a verified CSA member.
 - **Discord messages:** nothing is sent. Every DM and admin-channel post is written to `printq.notifications` and listed under *Messages sent* on the staff dashboard.
-- **Lab status:** staff toggle it on the dashboard instead of `/sccroom`. Opening it sends "the lab is open" messages to today's bookers.
+- **Lab status:** staff toggle it on the dashboard or the Discord preview's board instead of `/sccroom`. Opening it sends "the lab is open" messages to today's bookers.
+- **Discord channels:** **Staff → Discord** shows the staff channel (board + one card per booking), the public board and members' DMs. Every button, menu, form and the quick `/printstaff` and `/print` commands run the real interaction handler.
 - **Printer readings:** nozzle/bed/filament values are simulated.
 - **Cron:** "Run scheduled jobs now" runs the same jobs as `POST /api/printq/cron` (hold expiry, reminders, upload cleanup).
 

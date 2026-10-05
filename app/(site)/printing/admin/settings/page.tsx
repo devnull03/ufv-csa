@@ -3,12 +3,13 @@ import { PrintQHeader } from "~/app/printq/components/shared";
 import { LabHoursSummary } from "~/app/printq/components/schedule";
 import { db, schema } from "~/app/printq/db/client";
 import { getSettings } from "~/app/printq/settings";
+import { LabHoursEditor } from "~/app/printq/ui/AvailabilityEditors";
 import { requireRolePage } from "~/app/printq/viewer";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Settings" };
 
-// DESIGN_BRIEF §4.11. Editors are read-only placeholders; saving comes with the real design.
+// DESIGN_BRIEF §4.11. Lab hours are editable (shared with /printstaff hours in Discord); the rest are read-only placeholders.
 export default async function SettingsPage() {
   await requireRolePage("admin", "/printing/admin/settings");
   const database = db();
@@ -22,11 +23,17 @@ export default async function SettingsPage() {
     <>
       <PrintQHeader title="Settings" />
       <LabHoursSummary weeklyHours={hours} />
-      <SettingsPanel
-        name="LabHoursEditor"
-        spec="§4.11"
-        value={hours}
-        note="Weekday × time ranges in America/Vancouver, plus 'suggest from room history' (from /sccroom toggles)."
+      <LabHoursEditor
+        initial={Object.fromEntries(
+          [0, 1, 2, 3, 4, 5, 6].map((weekday) => [
+            weekday,
+            hours
+              .filter((row) => row.weekday === weekday && row.printerId === null)
+              .sort((a, b) => a.opensAt.localeCompare(b.opensAt))
+              .map((row) => `${row.opensAt.slice(0, 5)}-${row.closesAt.slice(0, 5)}`)
+              .join(", "),
+          ])
+        )}
       />
       <SettingsPanel name="PolicyForm" spec="§4.11" value={settings} />
       <SettingsPanel name="PrinterForm" spec="§4.11" value={printers} />

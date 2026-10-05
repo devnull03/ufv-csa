@@ -2,6 +2,8 @@
 
 PrintQ runs inside the **existing CSA Discord app**, the one that already handles `/sccroom`. It is not a separate bot. Everything goes through the existing HTTP interactions endpoint (`app/(site)/api/webhooks/discord/interact/route.ts`). There is no always-on gateway process, so nothing extra runs on the UFV server.
 
+> **Status: built** on `feat/printq-local` (phases D1–D6 below). The rest of this page is the design; §9 lists where the build differs from it and how to set it up.
+
 Goal: staff can run the printer from one private channel. The bot posts requests and updates there, and staff approve, run sessions and change availability from it. The website stays the full UI for students. Discord is the fast lane for staff and a convenience for members.
 
 ## 1. What exists today
@@ -154,3 +156,37 @@ Demo mode keeps everything working without a real server:
 3. **Threads per request** (recommended), or plain replies in the channel.
 4. **Public board** in a members' channel: yes/no, and which channel.
 5. **Lab hours from Discord:** admins only (recommended), or all staff.
+
+## 9. As built
+
+All six phases are implemented. Code map:
+
+| Piece | File |
+|---|---|
+| Message renderers (cards, board, public board, modals, confirmations) | `app/printq/discord/render.ts` |
+| Post-once-then-edit sync, threads, pins, re-post on 404, demo storage | `app/printq/discord/sync.ts` + `printq.discord_messages` (migration 0004) |
+| Buttons, select menus, modals, `/print` and `/printstaff` | `app/printq/discord/handlers.ts` |
+| Staff check (PrintQ role, `PRINTQ_STAFF_ROLE_ID`, `PRINTQ_ADMIN_DISCORD_IDS`) | `app/printq/discord/staff.ts` |
+| Shared lab toggle used by `/sccroom` and the board | `app/printq/discord/room.ts` |
+| Closures, lab hours, confirmation drafts | `app/printq/availability.ts` |
+| Date phrases (`Fri 12:30-4pm`, `Oct 9 all day`, `Wed 2pm`) | `app/printq/scheduling/when.ts` |
+| Move time | `moveBooking` in `app/printq/bookings.ts` |
+| Replay protection (±5 min timestamp) | `app/printq/discord/freshness.ts`, used by `verifyInteractionRequest` |
+| Demo preview (clickable channel, public board, DMs) | `/printing/admin/discord`, `app/printq/ui/DiscordPreview.tsx`, `POST /api/printq/demo/discord` |
+| Website editors using the same service | closures on `/printing/admin/schedule`, lab hours on `/printing/admin/settings` |
+
+**Differences from the plan:**
+
+- **No printer-status select on the board.** The site treats "no active printer" as "PrintQ is unavailable" in 15 places, so flipping the printer to maintenance would take the whole booking site down. Instead, staff add a closure of type **maintenance**, which already blocks the printer outright (running prints too), shows on the schedule and goes through the same confirmation.
+- **Decisions (§8) taken with the recommended options:** the lab button is `/sccroom`; staff are recognised by role; one thread per request; lab hours are admin-only. The public board is on whenever `PRINTQ_PUBLIC_CHANNEL_ID` is set.
+- **Pending cards show Reject instead of Cancel.** Staff can technically cancel a pending request, but Reject (with a reason) is the right action there.
+
+**Setup on the real server:**
+
+1. Create **#printq-staff** (private, staff role only). Give the CSA app: View Channel, Send Messages, Embed Links, Create Public Threads, Send Messages in Threads, Manage Messages (to pin). Optional: a public channel for the anonymous board (View Channel, Send Messages, Embed Links, Manage Messages).
+2. Set `PRINTQ_ADMIN_CHANNEL_ID`, optionally `PRINTQ_PUBLIC_CHANNEL_ID`, and `PRINTQ_STAFF_ROLE_ID` (the Discord role whose members count as staff).
+3. `npm run discord:register` (dry run), then `npm run discord:register -- --apply`. This adds/updates `/print` and `/printstaff` one at a time and never touches `/sccroom`.
+4. In Server Settings → Integrations → CSA app, allow `/printstaff` for the staff role (it's hidden from everyone by default).
+5. Run `/printstaff board` once in #printq-staff to post and pin the board. Cards appear by themselves as requests come in.
+
+**Try it without Discord:** with `PRINTQ_DEMO=true`, sign in as the demo staff account and open **Staff → Discord**. Everything there runs through the same handler Discord would call.

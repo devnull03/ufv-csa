@@ -10,6 +10,7 @@ const ADMIN_LINKS: { href: string; label: string; minRole: Exclude<UserRole, "me
   { href: "/printing/admin/approvals", label: "Approvals", minRole: "staff" },
   { href: "/printing/admin/session", label: "Session", minRole: "staff" },
   { href: "/printing/admin/schedule", label: "Schedule", minRole: "staff" },
+  { href: "/printing/admin/discord", label: "Discord", minRole: "staff" },
   { href: "/printing/admin/settings", label: "Settings", minRole: "admin" },
   { href: "/printing/admin/users", label: "Users", minRole: "admin" },
   { href: "/printing/admin/audit", label: "Audit", minRole: "admin" },

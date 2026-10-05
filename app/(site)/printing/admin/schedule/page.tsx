@@ -1,4 +1,7 @@
 import { Placeholder } from "~/app/printq/components/Placeholder";
+import { listUpcomingClosures } from "~/app/printq/availability";
+import { closureLine } from "~/app/printq/discord/render";
+import { ClosureForm, RemoveClosureButton } from "~/app/printq/ui/AvailabilityEditors";
 import { EmptyState, PrintQHeader } from "~/app/printq/components/shared";
 import { WeekSchedule } from "~/app/printq/components/schedule";
 import { PRINTQ_TIMEZONE } from "~/app/printq/constants";
@@ -16,7 +19,7 @@ export default async function ScheduleManagerPage() {
   const today = localDateOf(new Date(), PRINTQ_TIMEZONE);
   const start = fromLocal({ ...today, hour: 0, minute: 0 }, PRINTQ_TIMEZONE);
   const end = fromLocal({ ...addLocalDays(today, 14), hour: 0, minute: 0 }, PRINTQ_TIMEZONE);
-  const data = await loadScheduleData(printer.id, { start, end });
+  const [data, closures] = await Promise.all([loadScheduleData(printer.id, { start, end }), listUpcomingClosures()]);
 
   return (
     <>
@@ -39,9 +42,25 @@ export default async function ScheduleManagerPage() {
       <Placeholder name="BookingDrawer" spec="§4.10">
         Click a block to open booking details and actions in a side sheet.
       </Placeholder>
-      <Placeholder name="ClosureForm" spec="§4.10">
-        Create a closure or maintenance block, preview the affected bookings, and notify their members. TODO: server action.
-      </Placeholder>
+      <ClosureForm today={`${today.year}-${String(today.month).padStart(2, "0")}-${String(today.day).padStart(2, "0")}`} />
+      <section className="flex flex-col gap-3">
+        <h6>Upcoming closures</h6>
+        {closures.length === 0 ? (
+          <div className="pq-panel pq-soft p-5">None. The lab follows its weekly hours.</div>
+        ) : (
+          <div className="pq-panel flex flex-col">
+            {closures.map((closure, index) => {
+              const label = closureLine({ id: closure.id, kind: closure.kind, reason: closure.reason, ...closure.during });
+              return (
+                <div key={closure.id} className={`flex flex-wrap items-center gap-3 px-4 py-3 ${index ? "pq-rule-t" : ""}`}>
+                  <span className="mr-auto">{label}</span>
+                  <RemoveClosureButton id={closure.id} label={label} />
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
     </>
   );
 }
