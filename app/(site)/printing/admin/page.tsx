@@ -6,7 +6,7 @@ import { getLabStatus } from "~/app/printq/lab-status";
 import { recentNotifications } from "~/app/printq/notify";
 import { countPending, listBookingsForStaff } from "~/app/printq/queries";
 import { allowedActions } from "~/app/printq/scheduling/state-machine";
-import { LabToggle, RunJobsButton } from "~/app/printq/ui/StaffControls";
+import { LabToggle, ResetDemoButton, RunJobsButton } from "~/app/printq/ui/StaffControls";
 import { StatusTag } from "~/app/printq/ui/StatusTag";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +32,7 @@ export default async function AdminDashboardPage() {
         </div>
         {labStatus.source === "printq" ? <LabToggle open={labStatus.open} /> : null}
         {demo ? <RunJobsButton /> : null}
+        {demo ? <ResetDemoButton /> : null}
       </div>
 
       <div className="pq-stats" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>

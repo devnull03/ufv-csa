@@ -136,7 +136,7 @@ The DB tests **truncate** the database they point at, so give them their own mig
    - Add the redirect URI `https://csa.ufv.ca/api/printq/auth/callback/discord` in the same place.
 3. **Uploads directory:** `sudo mkdir -p /var/lib/printq/uploads`, owned by the user that runs the site.
 4. **nginx:** include `deploy/printq/nginx-printq.conf`. The default 1 MB body limit would reject uploads.
-5. **Jobs:** install `deploy/printq/printq-cron.{service,timer}` and run `systemctl enable --now printq-cron.timer`.
+5. **Jobs and migrations:** the server applies migrations and runs PrintQ's scheduled jobs itself on start (`instrumentation.ts`). The systemd timer in `deploy/printq/printq-cron.*` is only needed if you set `PRINTQ_SCHEDULER=false`.
 6. **Backups:** schedule `deploy/printq/backup.sh` nightly and copy its output off the server.
 7. **Discord command:** run `npm run discord:register` (dry run), then `npm run discord:register -- --apply`. This adds `/print` without touching `/sccroom`.
 8. **Launch:** set `NEXT_PUBLIC_PRINTQ_ENABLED=true` and rebuild. The flag is inlined at build time for the nav link.

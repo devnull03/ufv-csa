@@ -2,9 +2,10 @@
 # The CSA site (including PrintQ) as a container. Used by docker-compose.yml.
 #
 #   deps    → npm ci (all dependencies)
-#   tools   → deps + source: runs migrations and seed scripts (the "migrate" service)
 #   builder → production build
-#   runner  → small image with only the standalone server (the "web" service)
+#   runner  → small image with only the standalone server. On start it applies
+#             PrintQ's database migrations and runs its scheduled jobs
+#             (instrumentation.ts), so no other containers are needed.
 
 ARG NODE_VERSION=22
 
@@ -14,10 +15,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
-FROM deps AS tools
+FROM deps AS builder
 COPY . .
-
-FROM tools AS builder
 # NEXT_PUBLIC_* values are baked into the build, so they are build arguments
 # (docker-compose.yml passes them from .env).
 ARG NEXT_PUBLIC_SANITY_PROJECT_ID=dummy000
@@ -54,6 +53,8 @@ RUN mkdir -p /data/uploads && chown -R node:node /data
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 COPY --from=builder --chown=node:node /app/public ./public
+# SQL migrations, applied by the server on start
+COPY --from=builder --chown=node:node /app/drizzle ./drizzle
 USER node
 EXPOSE 3000
 VOLUME ["/data/uploads"]
