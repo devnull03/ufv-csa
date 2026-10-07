@@ -48,7 +48,8 @@ let cached: PrintQEnv | undefined;
 // Validated lazily so `next build` does not need PrintQ secrets.
 export function printqEnv(): PrintQEnv {
   if (!cached) {
-    const parsed = schema.safeParse(process.env);
+    // `KEY=` lines in an env file arrive as empty strings: treat them as unset.
+    const parsed = schema.safeParse(Object.fromEntries(Object.entries(process.env).filter(([, value]) => value !== "")));
     if (!parsed.success) {
       const missing = parsed.error.issues.map((issue) => issue.path.join(".")).join(", ");
       throw new Error(`PrintQ is misconfigured. Check env vars: ${missing}`);

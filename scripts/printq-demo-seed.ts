@@ -51,6 +51,14 @@ const at = (date: LocalDate, clock: string) => {
 const quarter = (date: Date) => new Date(Math.round(date.getTime() / 900_000) * 900_000);
 
 async function main() {
+  if (!reset) {
+    // Re-running (e.g. on every container start) must not duplicate the demo bookings.
+    const [{ existing }] = await sql`SELECT count(*)::int AS existing FROM printq.bookings WHERE owner_id LIKE 'demo-%'`;
+    if (existing > 0) {
+      console.log("Demo data already present; run with --reset to start over.");
+      return;
+    }
+  }
   await sql.begin(async (tx) => {
     if (reset) {
       await tx`DELETE FROM printq.notifications`;

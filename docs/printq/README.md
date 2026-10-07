@@ -64,6 +64,10 @@ deploy/printq/              nginx snippet, systemd timer, backup script, dev doc
 
 ## Try the prototype (demo mode)
 
+**Easiest: containers.** `cp .env.example .env`, fill in the two secrets, `docker compose up --build`, open http://localhost:3000/printing. See [`DOCKER.md`](./DOCKER.md) (works with Podman too).
+
+Or run it directly with Node:
+
 Everything runs for real (Postgres, Better Auth sessions, the booking engine and state machine, the notification hooks); only the outside world is faked.
 
 ```bash

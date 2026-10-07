@@ -1,0 +1,16 @@
+# Keep the build context small and secrets out of images.
+.git
+.github
+node_modules
+.next
+out
+coverage
+.vercel
+.printq-uploads
+*.log
+.DS_Store
+
+# Environment files are passed at runtime (docker-compose.yml env_file), never baked in.
+.env
+.env.*
+!.env.example

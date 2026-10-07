@@ -11,8 +11,10 @@ const role = (process.argv[2] ?? "admin") as "member" | "staff" | "admin";
 const databaseUrl = process.env.DATABASE_URL ?? "postgres://printq:printq@localhost:5432/printq";
 const secret = process.env.BETTER_AUTH_SECRET ?? "";
 
-if (process.env.NODE_ENV === "production" || !/@(localhost|127\.0\.0\.1)[:/]/.test(databaseUrl)) {
-  console.error("Refusing to run: only for a local development database.");
+// Local databases only, or a demo instance (e.g. the docker compose stack, where the host is "db").
+const isLocal = /@(localhost|127\.0\.0\.1)[:/]/.test(databaseUrl);
+if (process.env.NODE_ENV === "production" || (!isLocal && process.env.PRINTQ_DEMO !== "true")) {
+  console.error("Refusing to run: only for a local development database (or PRINTQ_DEMO=true).");
   process.exit(1);
 }
 if (!secret) {
