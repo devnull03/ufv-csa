@@ -10,6 +10,7 @@
  */
 import { randomUUID } from "node:crypto";
 import postgres from "postgres";
+import { DEFAULT_PRINTER_MODEL, printerSpec } from "../app/printq/printers";
 import { addLocalDays, fromLocal, localDateOf, weekdayOf, type LocalDate } from "../app/printq/scheduling/time";
 
 const TZ = "America/Vancouver";
@@ -61,11 +62,17 @@ async function main() {
       await tx`DELETE FROM printq.settings WHERE key = 'labStatus'`;
     }
 
+    // The lab's Original Prusa i3 (PRINTQ_PRINTER_MODEL overrides the variant).
+    const spec = printerSpec(process.env.PRINTQ_PRINTER_MODEL ?? DEFAULT_PRINTER_MODEL)!;
     let [printer] = await tx`SELECT id, model FROM printq.printers WHERE status = 'active' ORDER BY created_at LIMIT 1`;
     if (!printer) {
       [printer] = await tx`
         INSERT INTO printq.printers (name, model, bed_x_mm, bed_y_mm, bed_z_mm)
-        VALUES ('Prusa MK4S', 'MK4S', 250, 210, 220) RETURNING id, model`;
+        VALUES (${spec.name}, ${spec.model}, ${spec.bed.x}, ${spec.bed.y}, ${spec.bed.z}) RETURNING id, model`;
+    } else if (reset) {
+      [printer] = await tx`
+        UPDATE printq.printers SET name = ${spec.name}, model = ${spec.model}, bed_x_mm = ${spec.bed.x}, bed_y_mm = ${spec.bed.y}, bed_z_mm = ${spec.bed.z}
+        WHERE id = ${printer.id} RETURNING id, model`;
     }
 
     const [{ hours }] = await tx`SELECT count(*)::int AS hours FROM printq.lab_hours`;
@@ -127,19 +134,33 @@ async function main() {
       const uploadId = randomUUID();
       const minutes = Math.round((booking.end.getTime() - booking.start.getTime()) / 60_000);
       const summary = {
-        format: "bgcode",
+        format: "gcode",
         printSeconds: Math.round(minutes * 60 * 0.85),
         filamentGrams: booking.grams,
         filamentType: "PLA",
-        printerModel: booking.title === "Keycap test" ? "MK3S" : printer.model,
+        printerModel: booking.title === "Keycap test" ? "MK4S" : printer.model,
         layerHeightMm: 0.2,
         nozzleDiameterMm: 0.4,
         bbox: null,
         hasThumbnail: false,
+        analysis: {
+          computedSeconds: Math.round(minutes * 60 * 0.88),
+          slicerSeconds: Math.round(minutes * 60 * 0.85),
+          timeSource: "slicer",
+          filamentMm: Math.round((booking.grams / 1.24 / (Math.PI * 0.875 ** 2)) * 1000),
+          filamentGrams: booking.grams,
+          modelSize: { x: 40 + (booking.grams % 60), y: 30 + (booking.grams % 45), z: 10 + (booking.grams % 50) },
+          layers: Math.round((10 + (booking.grams % 50)) / 0.2),
+          maxHotendC: booking.title === "Drone arm mount" ? 250 : 215,
+          maxBedC: booking.title === "Drone arm mount" ? 90 : 60,
+          filamentChanges: booking.title === "Name plate" ? 1 : 0,
+          pauses: 0,
+          tools: 1,
+        },
       };
       await tx`INSERT INTO printq.uploads (id, owner_id, storage_key, original_name, size_bytes, sha256, summary)
-               VALUES (${uploadId}, ${booking.owner}, ${`gcode/${uploadId}.bgcode`},
-                       ${`${booking.title.toLowerCase().replace(/[^a-z0-9]+/g, "_")}_0.2mm_PLA_MK4S.bgcode`}, 2400000, 'demo', ${sql.json(summary)})`;
+               VALUES (${uploadId}, ${booking.owner}, ${`gcode/${uploadId}.gcode`},
+                       ${`${booking.title.toLowerCase().replace(/[^a-z0-9]+/g, "_")}_0.2mm_PLA_${summary.printerModel}.gcode`}, 2400000, 'demo', ${sql.json(summary)})`;
       const holding = booking.status === "pending";
       const [row] = await tx`
         INSERT INTO printq.bookings (printer_id, owner_id, upload_id, slot, status, title, purpose, hold_expires_at, decision_reason, decided_by, decided_at)

@@ -32,7 +32,8 @@ export const USER_ROLES = ["member", "staff", "admin"] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
 export const PRINTER_STATUSES = ["active", "maintenance", "retired"] as const;
-export const PRINTER_MODELS = ["MK4S", "MK4", "MK3.9", "MK3S", "COREONE"] as const;
+// As written in `; printer_model = …` by PrusaSlicer (an MK3S+ writes "MK3S").
+export const PRINTER_MODELS = ["MK3S", "MK3", "MK2.5S", "MK2.5", "MK2S", "MK3.5", "MK3.9", "MK4", "MK4S", "COREONE"] as const;
 
 export const CLOSURE_KINDS = ["closure", "maintenance"] as const;
 

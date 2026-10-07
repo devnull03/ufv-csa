@@ -214,3 +214,59 @@ export function LabHoursEditor({ initial }: { initial: Record<number, string> })
     </div>
   );
 }
+
+export function PrinterVariantForm({
+  current,
+  options,
+}: {
+  current: { name: string; model: string; bed: string } | null;
+  options: { model: string; name: string; bed: string }[];
+}) {
+  const router = useRouter();
+  const [model, setModel] = useState(current?.model ?? options[0]?.model ?? "");
+  const [busy, setBusy] = useState(false);
+  return (
+    <form
+      className="pq-panel flex flex-col gap-3 p-5"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        setBusy(true);
+        try {
+          await call("/api/printq/admin/printer", { method: "PUT", body: JSON.stringify({ model }) });
+          toast.success("Printer saved");
+          router.refresh();
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : "Couldn't save");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <h6>Printer</h6>
+      <p className="pq-soft text-sm">
+        Which Original Prusa i3 is in the lab? The printer&apos;s screen shows it when idle (&ldquo;Prusa i3 MK3S OK.&rdquo;); an MK3S+ also says MK3S.
+        This sets the build volume and which files members must upload.
+      </p>
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="field" style={{ flex: "1 1 260px" }}>
+          <label htmlFor="pq-printer-model">Model</label>
+          <select id="pq-printer-model" className="input" value={model} onChange={(event) => setModel(event.target.value)}>
+            {options.map((option) => (
+              <option key={option.model} value={option.model}>
+                {option.name} · {option.bed} mm
+              </option>
+            ))}
+          </select>
+        </div>
+        <button type="submit" className="btn btn-primary" disabled={busy || model === current?.model}>
+          Save
+        </button>
+      </div>
+      {current ? (
+        <span className="pq-muted text-[13px]">
+          Now: {current.name} · {current.bed} mm
+        </span>
+      ) : null}
+    </form>
+  );
+}

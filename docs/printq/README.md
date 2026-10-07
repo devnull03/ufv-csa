@@ -6,6 +6,7 @@ It stores its data in a local PostgreSQL database (`printq` schema) on the same 
 
 - **Design:** the student flow (home, sign in, upload → choose time → review → sent, my prints) is built from the PrintQ design project ("Industry" re-tokened with CSA colours; theme in `app/printq/printq.css`, components in `app/printq/ui/`). Staff/admin pages are still **placeholder** UI per [`DESIGN_BRIEF.md`](./DESIGN_BRIEF.md).
 - **Background:** [`../printq-integration-audit.md`](../printq-integration-audit.md).
+- **The printer** (Original Prusa i3: variants, file formats, print calculations, PrusaLink/OctoPrint integration, 3D model): [`PRINTER.md`](./PRINTER.md).
 - **Discord bot** (staff channel, living request cards, availability from Discord): plan, as-built notes and setup in [`DISCORD_BOT.md`](./DISCORD_BOT.md).
 
 ## Status
@@ -14,9 +15,10 @@ It stores its data in a local PostgreSQL database (`printq` schema) on the same 
 |---|---|
 | DB schema + migrations (`drizzle/`) incl. no-double-booking exclusion constraint | ✅ done, tested against Postgres 16 |
 | Scheduling engine (`app/printq/scheduling/`) | ✅ done, unit-tested (DST, closures, overlaps) |
-| G-code / bgcode parser (`app/printq/gcode/`) | ✅ done, tested on synthetic fixtures; **add real PrusaSlicer exports** to `__tests__/fixtures/` |
+| G-code / bgcode parser (`app/printq/gcode/`) | ✅ done; reads slicer metadata **and** analyses the moves (time, filament, size, layers, pauses). Checked against Prusa's 15 MK3S sample files: time within 1.4–7.5 %, filament within 0.1 g |
+| Printer: Original Prusa i3 (MK3S default, variant picker in Settings), plain .gcode only, real 3D model | ✅ done. Live status via PrusaLink is the next step: see [`PRINTER.md`](./PRINTER.md) |
 | Discord login (Better Auth, `identify` scope) + bot-token membership/role check | ✅ done; full OAuth round trip integration-tested with Discord's API mocked (`discord.db.test.ts`) |
-| Demo mode (`PRINTQ_DEMO=true`): demo accounts, demo data, outbox, simulated telemetry | ✅ done (see below) |
+| Demo mode (`PRINTQ_DEMO=true`): demo accounts, demo data, outbox, Discord preview | ✅ done (see below) |
 | Upload → parse → availability → book → approve → session lifecycle APIs | ✅ done, integration-tested |
 | Student pages (home + 3D printer view, sign in, booking flow, my prints, booking detail) | ✅ designed UI, real data |
 | Staff dashboard, approvals, session | ✅ styled, real data, working actions |
@@ -27,7 +29,7 @@ It stores its data in a local PostgreSQL database (`printq` schema) on the same 
 | Closures and lab hours editors on the website | ✅ done (same service as the bot) |
 | Notifications: request received, admin approval post, decisions, 24 h / 1 h reminders, lab-opened, expired holds | ✅ done (`notify.ts`); every message is logged to `printq.notifications` and shown on the staff dashboard |
 | Room-status integration (`/sccroom` → "lab is open" DMs) | ✅ hook in place (`room-status.ts`); check-in/no-show automation still manual |
-| Printer telemetry | ⏳ simulated in demo mode (`telemetry.ts`); real printer hook later |
+| Live printer status | ⏳ planned via a Raspberry Pi + PrusaLink bridge ([`PRINTER.md`](./PRINTER.md) §4) |
 
 ## Layout
 
@@ -47,7 +49,9 @@ app/printq/                 non-route code
   notify.ts                 Discord DMs/admin posts + outbox log (printq.notifications)
   profiles.ts               Better Auth user → PrintQ profile/Viewer
   lab-status.ts             lab open/closed (Discord /sccroom, or local in demo)
-  demo.ts, telemetry.ts     demo sign-in sessions, simulated printer readings
+  demo.ts                   demo sign-in sessions
+  printers.ts               known printer variants (build volume, bgcode support)
+  gcode/analyze.ts          print time, filament, size, layers from the moves
   availability.ts           closures, lab hours, closure drafts (shared by bot and website)
   discord/                  REST, membership, commands, handlers, render (embeds/buttons), sync (cards/boards), staff, room toggle
   components/               PLACEHOLDER components named per DESIGN_BRIEF §5
@@ -89,7 +93,6 @@ What is faked in demo mode:
 - **Discord messages:** nothing is sent. Every DM and admin-channel post is written to `printq.notifications` and listed under *Messages sent* on the staff dashboard.
 - **Lab status:** staff toggle it on the dashboard or the Discord preview's board instead of `/sccroom`. Opening it sends "the lab is open" messages to today's bookers.
 - **Discord channels:** **Staff → Discord** shows the staff channel (board + one card per booking), the public board and members' DMs. Every button, menu, form and the quick `/printstaff` and `/print` commands run the real interaction handler.
-- **Printer readings:** nozzle/bed/filament values are simulated.
 - **Cron:** "Run scheduled jobs now" runs the same jobs as `POST /api/printq/cron` (hold expiry, reminders, upload cleanup).
 
 **Real Discord login in demo mode:** set `DISCORD_BOT_ID` and `DISCORD_CLIENT_SECRET` of a Discord app you control, and add `http://localhost:3000/api/printq/auth/callback/discord` as an OAuth2 redirect URI. "Continue with Discord" then works next to the demo accounts. Add `DISCORD_BOT_TOKEN`, `DISCORD_SERVER_ID` and `PRINTQ_VERIFIED_ROLE_ID` and turn `PRINTQ_DEMO` off to get real membership checks and real DMs.

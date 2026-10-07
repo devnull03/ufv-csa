@@ -1,12 +1,12 @@
-import { Box, CalendarClock, DoorClosed, Disc3, Layers, Thermometer, Timer } from "lucide-react";
+import { and, asc, eq, gt, inArray, sql } from "drizzle-orm";
+import { Box, CalendarCheck, CalendarClock, DoorClosed, FileCode2, Hourglass, Inbox, Timer } from "lucide-react";
 import { PRINTQ_TIMEZONE } from "~/app/printq/constants";
-import { busyFrom, nextFreeTime, weekStart } from "~/app/printq/calendar-view";
+import { busyFrom, freeMinutes, nextFreeTime, weekStart } from "~/app/printq/calendar-view";
 import { db, schema } from "~/app/printq/db/client";
-import { formatClock, formatDay, formatDuration, formatTime, WEEKDAY_NAMES } from "~/app/printq/format";
+import { formatClock, formatDay, formatDuration, formatTime, STATUS_LABELS, WEEKDAY_NAMES } from "~/app/printq/format";
 import { getLabStatus } from "~/app/printq/lab-status";
 import { getActivePrinter, getCurrentPrint, getNextClosure, loadCalendar } from "~/app/printq/schedule";
 import { getSettings } from "~/app/printq/settings";
-import { getPrinterTelemetry } from "~/app/printq/telemetry";
 import { PrinterHero } from "~/app/printq/ui/PrinterHero";
 import { WeekCalendar } from "~/app/printq/ui/WeekCalendar";
 import { getViewer } from "~/app/printq/viewer";
@@ -34,11 +34,26 @@ export default async function PrintingPage() {
 
   const now = new Date();
   const from = weekStart(now, PRINTQ_TIMEZONE);
-  const [calendar, current, nextClosure, hours] = await Promise.all([
+  const [calendar, current, nextClosure, hours, [mine], [{ pending }]] = await Promise.all([
     loadCalendar(printer.id, { start: from, end: new Date(from.getTime() + 14 * 86_400_000) }, viewer?.userId),
     getCurrentPrint(printer.id),
     getNextClosure(printer.id),
     db().select().from(schema.labHours),
+    viewer
+      ? db()
+          .select({ title: schema.bookings.title, status: schema.bookings.status, slot: schema.bookings.slot })
+          .from(schema.bookings)
+          .where(
+            and(
+              eq(schema.bookings.ownerId, viewer.userId),
+              inArray(schema.bookings.status, ["pending", "approved", "checked_in", "printing", "finished"]),
+              gt(sql`upper(${schema.bookings.slot})`, sql`now()`)
+            )
+          )
+          .orderBy(asc(sql`lower(${schema.bookings.slot})`))
+          .limit(1)
+      : Promise.resolve([]),
+    db().select({ pending: sql<number>`count(*)::int` }).from(schema.bookings).where(eq(schema.bookings.status, "pending")),
   ]);
 
   const todayKey = formatDay(now);
@@ -60,19 +75,38 @@ export default async function PrintingPage() {
   const nextBusy = current ? null : busyFrom(calendar, now);
   const freeUntil = nextBusy && todayWindow && nextBusy < todayWindow.end ? nextBusy : null;
 
-  const telemetry = getPrinterTelemetry(Boolean(current));
+  // What someone deciding when to book needs to know. No printer internals.
+  const week = freeMinutes(calendar, now, new Date(now.getTime() + 7 * 86_400_000));
+  const dayLabel = (date: Date) => (formatDay(date) === todayKey ? "Today" : formatDay(date));
   const stats = [
-    { icon: Thermometer, label: "Nozzle", ...telemetry.nozzle },
-    { icon: Layers, label: "Bed", ...telemetry.bed },
-    { icon: Disc3, label: "Loaded", ...telemetry.loaded },
     {
       icon: CalendarClock,
-      label: "Next opening",
-      value: free ? `${formatDay(free.at) === todayKey ? "Today" : formatDay(free.at)} ${formatTime(free.at)}` : "None soon",
+      label: "Next free time",
+      value: free ? `${dayLabel(free.at)} ${formatTime(free.at)}` : "None soon",
       sub: free ? `${formatDuration((free.windowEnd.getTime() - free.at.getTime()) / 60_000)} before close` : "Check back later",
     },
-    { icon: Box, label: "Build volume", value: `${printer.bedX}×${printer.bedY}×${printer.bedZ}`, sub: "mm" },
-    { icon: Timer, label: "Max booking", value: `${settings.maxPrintHours} h`, sub: "Start inside lab hours" },
+    {
+      icon: Hourglass,
+      label: "Free this week",
+      value: week.minutes ? formatDuration(week.minutes) : "Fully booked",
+      sub: week.days ? `Open slots on ${week.days} day${week.days === 1 ? "" : "s"}` : "Try next week",
+    },
+    mine
+      ? {
+          icon: CalendarCheck,
+          label: "Your next print",
+          value: `${dayLabel(mine.slot.start)} ${formatTime(mine.slot.start)}`,
+          sub: `${mine.title ?? "Print"} · ${STATUS_LABELS[mine.status]}`,
+        }
+      : {
+          icon: Inbox,
+          label: "Waiting for review",
+          value: pending === 0 ? "None" : `${pending} request${pending === 1 ? "" : "s"}`,
+          sub: `Staff review within ${settings.holdHours} h`,
+        },
+    { icon: Box, label: "Fits up to", value: `${printer.bedX}×${printer.bedY}×${printer.bedZ}`, sub: "mm (X×Y×Z)" },
+    { icon: FileCode2, label: "Slice for", value: printer.model, sub: "PrusaSlicer .gcode" },
+    { icon: Timer, label: "Longest print", value: `${settings.maxPrintHours} h`, sub: "Must start in lab hours" },
   ];
 
   const sortedHours = WEEKDAY_NAMES.map((day, index) => ({

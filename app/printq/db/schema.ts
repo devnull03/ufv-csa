@@ -173,8 +173,29 @@ export interface ParsedGcodeSummary {
   printerModel: string | null;
   layerHeightMm?: number | null;
   nozzleDiameterMm?: number | null;
+  /** Space the print needs on the bed (skirt/brim included), mm. */
   bbox: { x: number; y: number; z: number } | null;
   hasThumbnail: boolean;
+  /** Our own read of the moves in the file (plain .gcode only). */
+  analysis?: PrintAnalysis;
+}
+
+export interface PrintAnalysis {
+  /** Simulated motion time; compare with the slicer's estimate. */
+  computedSeconds: number;
+  slicerSeconds: number | null;
+  /** Where printSeconds came from. */
+  timeSource: "slicer" | "m73" | "computed";
+  filamentMm: number;
+  filamentGrams: number;
+  /** The model itself, without skirt/brim/wipe tower. */
+  modelSize: { x: number; y: number; z: number } | null;
+  layers: number;
+  maxHotendC: number | null;
+  maxBedC: number | null;
+  filamentChanges: number;
+  pauses: number;
+  tools: number;
 }
 
 export const uploads = printq.table("uploads", {

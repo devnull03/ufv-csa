@@ -3,17 +3,19 @@
  *   npx tsx --env-file=.env.local scripts/printq-seed.ts
  */
 import postgres from "postgres";
+import { DEFAULT_PRINTER_MODEL, printerSpec } from "../app/printq/printers";
 
 const sql = postgres(process.env.DATABASE_URL ?? "postgres://printq:printq@localhost:5432/printq", { max: 1 });
 
 async function main() {
   const [{ printers }] = await sql`SELECT count(*)::int AS printers FROM printq.printers`;
   if (printers === 0) {
-    const model = process.env.PRINTQ_PRINTER_MODEL ?? "MK4S";
+    const spec = printerSpec(process.env.PRINTQ_PRINTER_MODEL ?? DEFAULT_PRINTER_MODEL);
+    if (!spec) throw new Error("Unknown PRINTQ_PRINTER_MODEL (use e.g. MK3S, MK3, MK2.5S)");
     await sql`
       INSERT INTO printq.printers (name, model, bed_x_mm, bed_y_mm, bed_z_mm)
-      VALUES (${`Prusa ${model}`}, ${model}, 250, 210, 220)`;
-    console.log(`Added printer: Prusa ${model}`);
+      VALUES (${spec.name}, ${spec.model}, ${spec.bed.x}, ${spec.bed.y}, ${spec.bed.z})`;
+    console.log(`Added printer: ${spec.name}`);
   }
 
   const [{ hours }] = await sql`SELECT count(*)::int AS hours FROM printq.lab_hours`;

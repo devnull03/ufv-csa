@@ -158,6 +158,9 @@ export function renderCard(data: CardData, options: { live: boolean; siteOrigin:
   const modelOk = summary?.printerModel ? summary.printerModel.toUpperCase().replace(/\s/g, "") === data.printerModel.toUpperCase() : null;
   const specs = [
     summary?.filamentGrams != null ? `${Math.round(summary.filamentGrams)} g ${summary.filamentType ?? ""}`.trim() : null,
+    summary?.analysis?.modelSize
+      ? `${Math.round(summary.analysis.modelSize.x)}×${Math.round(summary.analysis.modelSize.y)}×${Math.round(summary.analysis.modelSize.z)} mm`
+      : null,
     summary?.layerHeightMm ? `${summary.layerHeightMm} mm layers` : null,
     summary?.printerModel ? `${summary.printerModel} ${modelOk ? "✓" : "⚠️ not our printer"}` : null,
   ].filter(Boolean);
@@ -170,6 +173,11 @@ export function renderCard(data: CardData, options: { live: boolean; siteOrigin:
     booking.modelUrl ? `Model: ${booking.modelUrl}` : null,
     booking.notes ? `> ${booking.notes.replace(/\n/g, "\n> ")}` : null,
   ];
+  const analysis = summary?.analysis;
+  if (analysis?.filamentChanges) lines.push(`⚠️ Stops for ${analysis.filamentChanges} filament change${analysis.filamentChanges === 1 ? "" : "s"}: someone must be there`);
+  if (analysis?.pauses) lines.push(`⚠️ Pauses ${analysis.pauses}× and waits to be resumed`);
+  if (analysis && analysis.tools > 1) lines.push(`⚠️ Multi-material: ${analysis.tools} filaments`);
+  if (analysis?.maxHotendC && analysis.maxHotendC >= 240) lines.push(`🌡️ Hotend ${analysis.maxHotendC} °C, bed ${analysis.maxBedC ?? "?"} °C (not PLA temps)`);
   if (booking.status === "pending" && booking.holdExpiresAt) lines.push(`Hold expires ${relative(booking.holdExpiresAt, live, options.now)}`);
   if (data.decidedBy && booking.status !== "pending") {
     const verb = booking.status === "rejected" ? "Declined" : "Approved";

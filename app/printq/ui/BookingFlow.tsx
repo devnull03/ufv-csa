@@ -3,6 +3,7 @@
 import { SiDiscord } from "@icons-pack/react-simple-icons";
 import {
   AlertCircle,
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   Check,
@@ -24,7 +25,7 @@ import type { CalendarData } from "../calendar";
 import { ACCEPTED_EXTENSIONS, MAX_UPLOAD_BYTES, type BookingPurpose } from "../constants";
 import type { ParsedGcodeSummary } from "../db/schema";
 import { formatDay, formatDuration, formatTime } from "../format";
-import { fitsBuildVolume, printerModelMatches } from "../gcode/model";
+import { fitsBuildVolume, printerAcceptsBgcode, printerModelMatches } from "../gcode/model";
 import { availableStarts, explainStart, type StartProblem } from "../scheduling/slots";
 import { WeekCalendar } from "./WeekCalendar";
 
@@ -152,11 +153,16 @@ export function BookingFlow({ printer }: { printer: FlowPrinter }) {
   );
 
   // --- Upload ---
+  const extensions: string[] = printerAcceptsBgcode(printer.model) ? [...ACCEPTED_EXTENSIONS] : [".gcode"];
   async function handleFile(file: File | undefined) {
     if (!file || busy) return;
     setUploadError(null);
-    if (!ACCEPTED_EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext))) {
-      setUploadError({ title: "That's not a G-code file", body: "Export a .gcode or .bgcode file from PrusaSlicer." });
+    if (!extensions.some((ext) => file.name.toLowerCase().endsWith(ext))) {
+      setUploadError(
+        file.name.toLowerCase().endsWith(".bgcode")
+          ? { title: "This printer can't read .bgcode", body: "In PrusaSlicer, export a plain .gcode file (Printer Settings → General → Binary G-code off)." }
+          : { title: "That's not a G-code file", body: `Export a ${extensions.join(" or ")} file from PrusaSlicer.` }
+      );
       return;
     }
     if (file.size > MAX_UPLOAD_BYTES) {
@@ -316,6 +322,18 @@ export function BookingFlow({ printer }: { printer: FlowPrinter }) {
   };
   const stepIndex = STEPS.findIndex((item) => item.id === step);
   const grams = upload?.summary.filamentGrams ? `${Math.round(upload.summary.filamentGrams)} g` : "—";
+  const analysis = upload?.summary.analysis;
+  const modelSize = analysis?.modelSize ?? upload?.summary.bbox ?? null;
+  // Things the member has to be there for, read from the file itself.
+  const attention = analysis
+    ? [
+        analysis.filamentChanges
+          ? `This print stops for ${analysis.filamentChanges} filament change${analysis.filamentChanges === 1 ? "" : "s"}. You'll need to be in the lab to swap it.`
+          : null,
+        analysis.pauses ? `This print pauses ${analysis.pauses} time${analysis.pauses === 1 ? "" : "s"} and waits for someone to resume it.` : null,
+        analysis.tools > 1 ? `It uses ${analysis.tools} filaments (multi-material). Check with staff first.` : null,
+      ].filter((line): line is string => Boolean(line))
+    : [];
   const material = upload?.summary.filamentType ?? "";
   const lengthCopy = availability?.mustFinishInLabHours
     ? "Prints must start and finish inside lab hours. Starts snap to 15 minutes."
@@ -369,16 +387,16 @@ export function BookingFlow({ printer }: { printer: FlowPrinter }) {
                             ? uploadError.title
                             : dragOver
                               ? "Drop to upload"
-                              : "Drop your .bgcode here or click to browse"}
+                              : `Drop your ${extensions[extensions.length - 1]} here or click to browse`}
                     </span>
                     <span className={uploadError ? "pq-note-error text-sm" : "pq-muted text-sm"}>
-                      {uploadError ? uploadError.body : `.gcode or .bgcode · PrusaSlicer ${printer.model} profile · max 50 MB`}
+                      {uploadError ? uploadError.body : `${extensions.join(" or ")} · PrusaSlicer ${printer.model} profile · max 50 MB`}
                     </span>
                   </button>
                   <input
                     ref={fileInput}
                     type="file"
-                    accept={ACCEPTED_EXTENSIONS.join(",")}
+                    accept={extensions.join(",")}
                     className="sr-only"
                     tabIndex={-1}
                     onChange={(event) => {
@@ -410,8 +428,15 @@ export function BookingFlow({ printer }: { printer: FlowPrinter }) {
                         {[
                           ["Print time", formatDuration(fileMinutes)],
                           ["Filament", `${grams} ${material}`.trim()],
-                          ["Layer height", upload.summary.layerHeightMm ? `${upload.summary.layerHeightMm.toFixed(2)} mm` : "—"],
-                          ["Nozzle", upload.summary.nozzleDiameterMm ? `${upload.summary.nozzleDiameterMm} mm` : "—"],
+                          ["Size", modelSize ? `${Math.round(modelSize.x)}×${Math.round(modelSize.y)}×${Math.round(modelSize.z)} mm` : "—"],
+                          [
+                            "Layers",
+                            analysis?.layers
+                              ? `${analysis.layers}${upload.summary.layerHeightMm ? ` × ${upload.summary.layerHeightMm.toFixed(2)} mm` : ""}`
+                              : upload.summary.layerHeightMm
+                                ? `${upload.summary.layerHeightMm.toFixed(2)} mm`
+                                : "—",
+                          ],
                         ].map(([label, value]) => (
                           <div key={label}>
                             <div className="pq-label">{label}</div>
@@ -423,7 +448,14 @@ export function BookingFlow({ printer }: { printer: FlowPrinter }) {
                         <CheckCircle2 size={14} strokeWidth={1.5} aria-hidden />
                         Sliced for Prusa {printer.model}
                         {fitsBuildVolume(upload.summary.bbox, printer) ? " · fits build volume" : ""}
+                        {analysis?.timeSource === "computed" ? " · time estimated by PrintQ" : ""}
                       </div>
+                      {attention.map((line) => (
+                        <div key={line} className="pq-note-caution flex items-start gap-2 px-4 pb-2 text-[13px]">
+                          <AlertTriangle size={14} strokeWidth={1.5} className="mt-0.5 shrink-0" aria-hidden />
+                          {line}
+                        </div>
+                      ))}
                     </div>
                   </div>
                   <div className="pq-panel flex flex-col gap-3 p-4">

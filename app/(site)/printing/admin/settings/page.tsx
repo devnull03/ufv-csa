@@ -3,7 +3,8 @@ import { PrintQHeader } from "~/app/printq/components/shared";
 import { LabHoursSummary } from "~/app/printq/components/schedule";
 import { db, schema } from "~/app/printq/db/client";
 import { getSettings } from "~/app/printq/settings";
-import { LabHoursEditor } from "~/app/printq/ui/AvailabilityEditors";
+import { PRINTER_SPECS } from "~/app/printq/printers";
+import { LabHoursEditor, PrinterVariantForm } from "~/app/printq/ui/AvailabilityEditors";
 import { requireRolePage } from "~/app/printq/viewer";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,8 @@ export default async function SettingsPage() {
     database.select().from(schema.labHours),
     database.select().from(schema.printers),
   ]);
+
+  const printer = printers.find((row) => row.status !== "retired") ?? null;
 
   return (
     <>
@@ -36,7 +39,10 @@ export default async function SettingsPage() {
         )}
       />
       <SettingsPanel name="PolicyForm" spec="§4.11" value={settings} />
-      <SettingsPanel name="PrinterForm" spec="§4.11" value={printers} />
+      <PrinterVariantForm
+        current={printer ? { name: printer.name, model: printer.model, bed: `${printer.bedX}×${printer.bedY}×${printer.bedZ}` } : null}
+        options={PRINTER_SPECS.map((spec) => ({ model: spec.model, name: spec.name, bed: `${spec.bed.x}×${spec.bed.y}×${spec.bed.z}` }))}
+      />
     </>
   );
 }

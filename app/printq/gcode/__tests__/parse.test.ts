@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { bufferSource, fitsBuildVolume, GcodeParseError, parseDuration, parseGcodeFile, printerModelMatches } from "..";
+import { bufferSource, fitsBuildVolume, GcodeParseError, parseDuration, parseGcodeFile, printerAcceptsBgcode, printerModelMatches } from "..";
 import { parseGcode } from "../parse";
 import { asciiGcode, binaryGcode, PNG_1PX } from "./fixtures";
 
@@ -33,6 +33,56 @@ describe("ASCII .gcode", () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+
+  it("adds its own analysis on disk, keeping the slicer's numbers when present", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "printq-"));
+    try {
+      // An MK3S-style file: no M555 print-area line, so the size comes from the moves.
+      const mk3s = [
+        "M73 P0 R2",
+        "M104 S215",
+        "M140 S60",
+        "M600",
+        ";LAYER_CHANGE",
+        "G1 X100 Y100 Z0.2 F7200",
+        "M83",
+        "G1 X150 Y100 E2 F1800",
+        "G1 X150 Y130 E1",
+        ";LAYER_CHANGE",
+        "G1 Z0.4",
+        "G1 X100 Y100 E2",
+        "; filament_type = PLA",
+        "; printer_model = MK3S",
+      ].join("\n");
+      const file = path.join(dir, "mk3s.gcode");
+      await writeFile(file, mk3s);
+      const { summary } = await parseGcodeFile(file);
+      expect(summary.printSeconds).toBe(120); // from M73: the slicer's figure wins
+      expect(summary.bbox).toEqual({ x: 50, y: 30, z: 0.4 });
+      expect(summary.analysis?.filamentMm).toBe(5);
+      expect(summary.analysis).toMatchObject({ timeSource: "m73", layers: 2, filamentChanges: 1, maxHotendC: 215, modelSize: { x: 50, y: 30, z: 0.4 } });
+
+      // No slicer estimate at all: PrintQ's own estimate is used.
+      await writeFile(file, mk3s.replace("M73 P0 R2\n", ""));
+      const computed = (await parseGcodeFile(file)).summary;
+      expect(computed.analysis?.timeSource).toBe("computed");
+      expect(computed.printSeconds).toBe(computed.analysis?.computedSeconds);
+
+      // The full fixture keeps its slicer time and M555 box.
+      await writeFile(file, asciiGcode());
+      const prusa = (await parseGcodeFile(file)).summary;
+      expect(prusa.printSeconds).toBe(5025);
+      expect(prusa.bbox).toEqual({ x: 67, y: 43.6, z: 18.2 });
+      expect(prusa.analysis?.timeSource).toBe("slicer");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("knows which printers can read binary G-code", () => {
+    for (const model of ["MK3S", "MK3S+", "MK3", "MK2.5S", "MK2S"]) expect(printerAcceptsBgcode(model)).toBe(false);
+    for (const model of ["MK4S", "MK3.9", "MK3.5", "COREONE"]) expect(printerAcceptsBgcode(model)).toBe(true);
   });
 
   it("rejects files that are not G-code", async () => {

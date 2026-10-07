@@ -12,8 +12,8 @@ const schema = z
     DATABASE_URL: z.string().url(),
     BETTER_AUTH_SECRET: z.string().min(32),
     SITE_DOMAIN: z.string().min(1),
-    // Demo mode: Discord bot calls and printer telemetry are replaced by dummy
-    // hooks, and the sign-in page offers demo accounts. Discord login still works
+    // Demo mode: Discord bot calls are replaced by an outbox and an in-browser
+    // preview, and the sign-in page offers demo accounts. Discord login still works
     // when its OAuth credentials are set.
     PRINTQ_DEMO: flag,
     // The existing CSA Discord application: its application ID doubles as the OAuth client ID.

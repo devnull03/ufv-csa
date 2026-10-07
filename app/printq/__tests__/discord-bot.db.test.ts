@@ -1,6 +1,7 @@
 import { InteractionResponseType, InteractionType } from "discord-api-types/v10";
 import { eq, sql } from "drizzle-orm";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { addLocalDays, fromLocal, localDateOf } from "../scheduling/time";
 
 // The staff-channel bot, end to end through the real interaction handler and
 // Postgres, in demo mode (messages are stored instead of sent).
@@ -228,11 +229,13 @@ describe.skipIf(!databaseUrl)("Discord staff channel (Postgres, demo mode)", () 
   });
 
   it("adds a closure only after confirming who it affects", async () => {
-    const tomorrow = startIn(24);
+    // 10:00 and 12:00 tomorrow, Vancouver time (not "24 h from now", which can cross midnight).
+    const date = addLocalDays(localDateOf(new Date(), "America/Vancouver"), 1);
+    const tomorrow = fromLocal({ ...date, hour: 10, minute: 0 }, "America/Vancouver");
     const approved = await booking("Robot chassis", tomorrow, "approved");
     const pending = await booking("Name plate", new Date(tomorrow.getTime() + 2 * hour));
     const later = await booking("Unaffected", new Date(tomorrow.getTime() + 50 * hour));
-    const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Vancouver" }).format(tomorrow);
+    const day = `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
 
     const form = await click(STAFF, "printq:addclosure:board");
     expect(form.type).toBe(InteractionResponseType.Modal);

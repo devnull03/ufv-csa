@@ -14,7 +14,7 @@ import {
 import { db, schema } from "./db/client";
 import { PrintQError, pgErrorCode } from "./errors";
 import { diskStore } from "./files";
-import { GcodeParseError, parseGcodeFile, printerModelMatches } from "./gcode";
+import { GcodeParseError, parseGcodeFile, printerAcceptsBgcode, printerModelMatches } from "./gcode";
 import { findAvailableSlots, getActivePrinter } from "./schedule";
 import { bookedDurationMinutes } from "./scheduling/slots";
 import { nextStatus, type BookingAction, type BookingActor } from "./scheduling/state-machine";
@@ -30,6 +30,12 @@ export type Upload = typeof schema.uploads.$inferSelect;
 export async function storeUpload(viewer: Viewer, filename: string, body: ReadableStream<Uint8Array>) {
   const extension = ACCEPTED_EXTENSIONS.find((ext) => filename.toLowerCase().endsWith(ext));
   if (!extension) throw new PrintQError("unsupported_file", "Upload a .gcode or .bgcode file sliced in PrusaSlicer");
+  if (extension === ".bgcode") {
+    const printer = await getActivePrinter().catch(() => null);
+    if (printer && !printerAcceptsBgcode(printer.model)) {
+      throw new PrintQError("unsupported_file", `The ${printer.model} can't read .bgcode. In PrusaSlicer, export a plain .gcode file instead.`);
+    }
+  }
 
   const store = diskStore();
   const id = randomUUID();

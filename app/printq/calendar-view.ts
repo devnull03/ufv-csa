@@ -174,3 +174,25 @@ export function busyFrom(data: CalendarData, from: Date): Date | null {
     .sort((a, b) => a.getTime() - b.getTime());
   return starts[0] ?? null;
 }
+
+/** Lab-hour minutes between `from` and `to` that no booking or maintenance covers. */
+export function freeMinutes(data: CalendarData, from: Date, to: Date): { minutes: number; days: number } {
+  const busy = data.blocks
+    .filter((block) => block.kind !== "closure")
+    .map((block) => ({ start: new Date(block.start).getTime(), end: new Date(block.end).getTime() }));
+  let total = 0;
+  const days = new Set<string>();
+  for (const window of data.windows) {
+    const start = Math.max(new Date(window.start).getTime(), from.getTime());
+    const end = Math.min(new Date(window.end).getTime(), to.getTime());
+    if (end <= start) continue;
+    let free = end - start;
+    for (const block of busy) free -= Math.max(0, Math.min(end, block.end) - Math.max(start, block.start));
+    if (free >= 15 * 60_000) {
+      // Overlapping blocks (maintenance over a booking) can't make time negative.
+      total += free;
+      days.add(new Date(start).toDateString());
+    }
+  }
+  return { minutes: Math.round(total / 60_000), days: days.size };
+}

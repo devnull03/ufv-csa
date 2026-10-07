@@ -7,7 +7,7 @@ const SECTIONS: { title: string; body: string }[] = [
   { title: "Who can book", body: "Members of the CSA Discord server with the verified role." },
   { title: "What you can print", body: "Personal, course and club projects. Nothing that breaks UFV policy, and no weapons." },
   { title: "Materials", body: "PLA and PETG, supplied by the CSA while stock lasts. Ask staff before bringing your own filament." },
-  { title: "Slicing", body: "Slice in PrusaSlicer with the profile for our exact printer and upload the .gcode or .bgcode file." },
+  { title: "Slicing", body: "Slice in PrusaSlicer with the profile for our exact printer and upload the plain .gcode file (our i3 can't read binary .bgcode)." },
   { title: "Booking and holds", body: "Your slot is held while staff review it. Requests that aren't reviewed in time expire." },
   { title: "Check-in and no-shows", body: "Come to D224 at the start of your slot and start the print with staff. Missing the grace period counts as a no-show." },
   { title: "Pickup", body: "Collect your print from the Student Computing Centre (D224) during lab hours, the same day if you can." },

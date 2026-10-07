@@ -1,0 +1,12 @@
+prusa-i3-mk3.glb: 3D model of the Original Prusa i3 MK3 shown on the PrintQ pages.
+
+Based on "Original Prusa i3 MK3 for Fusion 360 (and STL)" by Swesen
+  https://www.printables.com/model/179638  (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/)
+which is based on "Prusa i3 MK3 SolidWorks Assembly (with STEP)" by jzkmath
+  https://www.thingiverse.com/thing:2699771  https://github.com/jzkmath/Original-Prusa-i3  (GNU GPL)
+derived from the Original Prusa i3 by Prusa Research
+  https://github.com/prusa3d/Original-Prusa-i3  (GPL-2.0)
+
+Changes by the UFV CSA: decimated from 1.67M to 150k triangles with meshoptimizer,
+coloured by part shape, converted to glTF (meshopt-compressed). The same licences apply.
+"Original Prusa" is a trademark of Prusa Research; this site is not affiliated with or endorsed by Prusa Research.

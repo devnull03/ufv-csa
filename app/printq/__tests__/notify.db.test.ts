@@ -11,7 +11,6 @@ describe.skipIf(!databaseUrl)("notification hooks (Postgres, demo mode)", () => 
     jobs: typeof import("../jobs");
     client: typeof import("../db/client");
     schema: typeof import("../db/schema");
-    telemetry: typeof import("../telemetry");
   };
 
   beforeAll(async () => {
@@ -29,7 +28,6 @@ describe.skipIf(!databaseUrl)("notification hooks (Postgres, demo mode)", () => 
       jobs: await import("../jobs"),
       client: await import("../db/client"),
       schema: await import("../db/schema"),
-      telemetry: await import("../telemetry"),
     };
   });
 
@@ -103,10 +101,5 @@ describe.skipIf(!databaseUrl)("notification hooks (Postgres, demo mode)", () => 
     expect(opened).toHaveLength(1);
     expect(opened[0].bookingId).toBe(booking.id);
     expect((await mod.lab.getLabStatus()).open).toBe(true);
-  });
-
-  it("simulates printer telemetry in demo mode", () => {
-    expect(mod.telemetry.getPrinterTelemetry(true)).toMatchObject({ simulated: true, bed: { value: "60 °C" } });
-    expect(mod.telemetry.getPrinterTelemetry(false).nozzle.sub).toBe("Idle");
   });
 });

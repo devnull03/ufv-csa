@@ -16,3 +16,8 @@ export function fitsBuildVolume(
   if (!bbox) return null;
   return bbox.x <= bed.bedX && bbox.y <= bed.bedY && bbox.z <= bed.bedZ;
 }
+
+/** Binary .bgcode needs Prusa's 32-bit firmware (MINI, MK3.5/3.9, MK4, XL, CORE One); the 8-bit i3 MK2–MK3S+ can't read it. */
+export function printerAcceptsBgcode(printerModel: string) {
+  return !/^MK(2|2S|2\.5S?|3S?)$/i.test(printerModel.trim().replace(/\+$/, ""));
+}
