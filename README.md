@@ -1,40 +1,31 @@
-# Computing Student Association Website
+# CSA website
 
-### Website started on March 6, 2024 by DevelopsS15
+The website of the Computing Student Association (CSA) at the University of the Fraser Valley: [csa.ufv.ca](https://csa.ufv.ca). It includes PrintQ, the booking system for the CSA 3D printer, at `/printing`.
 
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+The site uses Next.js 15, Sanity, and PostgreSQL. DevelopsS15 started it on 2024-03-06.
 
-## Getting Started
+## Run the site on your computer
 
-First, run the development server:
+You need Docker or Podman.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. Copy the example configuration file:
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+   ```bash
+   cp .env.example .env
+   ```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+2. In `.env`, set `BETTER_AUTH_SECRET` and `PRINTQ_CRON_SECRET` to random values. To make a value, run `openssl rand -hex 32`.
+3. Start the site and the database:
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+   ```bash
+   docker compose up --build
+   ```
 
-## Learn More
+4. Open http://localhost:3000/printing.
 
-To learn more about Next.js, take a look at the following resources:
+PrintQ starts in demo mode, with demo accounts and no Discord connection. The pages that come from Sanity work only with the real `NEXT_PUBLIC_SANITY_PROJECT_ID`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## More information
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+- To set up a development environment and send a change, see [Contributing](CONTRIBUTING.md).
+- For PrintQ, see the [PrintQ documentation](docs/printq/README.md).
